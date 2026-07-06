@@ -17,6 +17,9 @@ interface HealthDao {
     @Query("SELECT * FROM daily_summary WHERE dayEpoch >= :fromDay ORDER BY dayEpoch")
     fun summariesSince(fromDay: Long): Flow<List<DailySummary>>
 
+    @Query("SELECT * FROM daily_summary ORDER BY dayEpoch")
+    suspend fun allSummaries(): List<DailySummary>
+
     @Query("SELECT * FROM daily_summary WHERE dayEpoch IN (:days)")
     suspend fun summariesByDays(days: List<Long>): List<DailySummary>
 

@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -174,6 +175,25 @@ private fun Dashboard(ui: DashboardViewModel.Ui, onRefresh: () -> Unit) {
                         "Steps appear once an app (Google Health, Samsung Health…) writes them to Health Connect. Your Fitbit Air will fill this in.",
                         color = Soft, fontSize = 11.sp, lineHeight = 16.sp,
                     )
+                }
+            }
+        }
+
+        // ── History (imported archive) ────────────────────────
+        if (ui.summaries.size > 30) item {
+            Panel {
+                Label("YOUR HISTORY · MONTHLY AVERAGES")
+                HistoryChart("STEPS / DAY", ui.summaries, Ok, "") { it.steps?.toDouble() }
+                HistoryChart("RESTING HEART RATE", ui.summaries, Sys, "bpm") { it.restingHr?.toDouble() }
+                HistoryChart("SLEEP", ui.summaries, Color(0xFF9D8CFF), "min") { it.sleepMinutes?.toDouble() }
+                HistoryChart("STRESS", ui.summaries, Warn, "") { it.stressAvg }
+                HistoryChart("EXERCISE", ui.summaries, Dia, "min/day") { it.exerciseMin?.toDouble() }
+                HistoryChart("WEIGHT", ui.summaries, Color(0xFFF0C36D), "kg") { it.weightKg }
+                val total = ui.summaries.sumOf { (it.steps ?: 0).toLong() }
+                if (total > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Lifetime steps: %,d  ·  ≈ %,d miles".format(total, total / 2100),
+                        color = Soft, fontSize = 12.sp)
                 }
             }
         }

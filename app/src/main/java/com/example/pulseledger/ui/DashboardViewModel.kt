@@ -7,6 +7,7 @@ import android.net.Uri
 import com.example.pulseledger.data.CsvImporter
 import com.example.pulseledger.data.HealthConnectManager
 import com.example.pulseledger.data.db.BpReading
+import com.example.pulseledger.data.db.DailySummary
 import com.example.pulseledger.data.db.Db
 import com.example.pulseledger.backfill.SamsungImporter
 import java.io.ByteArrayInputStream
@@ -28,6 +29,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val notice: String? = null,
         val historyDays: Int = 0,
         val historySince: Long? = null,
+        val summaries: List<DailySummary> = emptyList(),
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -75,6 +77,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val dao = Db.get(getApplication()).dao()
                 val histDays = dao.stepDaysCount()
                 val histSince = dao.earliestStepDay()
+                val allSummaries = dao.allSummaries()
 
                 _ui.value = _ui.value.copy(
                     loading = false,
@@ -84,6 +87,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     restingHr = rhr,
                     historyDays = histDays,
                     historySince = histSince,
+                    summaries = allSummaries,
                 )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(loading = false, error = t.message ?: "read failed")

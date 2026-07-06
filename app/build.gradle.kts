@@ -15,6 +15,18 @@ android {
         versionCode = 1
         versionName = "0.1"
     }
+    signingConfigs {
+        create("shared") {
+            storeFile = rootProject.file("pulse.keystore")
+            storePassword = "pulseledger"
+            keyAlias = "pulse"
+            keyPassword = "pulseledger"
+        }
+    }
+    buildTypes {
+        getByName("debug") { signingConfig = signingConfigs.getByName("shared") }
+        getByName("release") { signingConfig = signingConfigs.getByName("shared") }
+    }
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
