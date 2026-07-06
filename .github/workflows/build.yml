@@ -1,7 +1,11 @@
 name: Build Pulse Ledger APK
 on:
   push:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -21,7 +25,20 @@ jobs:
           gradle-version: "8.9"
 
       - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Publish failure log
+        if: failure()
+        run: |
+          tail -n 400 build.log > error-tail.txt
+          git config user.name "ci"
+          git config user.email "ci@local"
+          git checkout -B ci-logs
+          git add -f error-tail.txt
+          git commit -m "build error log"
+          git push -f origin ci-logs
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

@@ -9,7 +9,7 @@ interface HealthDao {
     @Upsert suspend fun upsertSummaries(summaries: List<DailySummary>)
 
     @Query("SELECT * FROM bp_readings ORDER BY epochMillis DESC LIMIT :limit")
-    fun latestReadings(limit: Int = 30): Flow<List<BpReading>>
+    fun latestReadings(limit: Int): Flow<List<BpReading>>
 
     @Query("SELECT * FROM daily_summary WHERE dayEpoch >= :fromDay ORDER BY dayEpoch")
     fun summariesSince(fromDay: Long): Flow<List<DailySummary>>
