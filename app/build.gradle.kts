@@ -7,11 +7,11 @@ plugins {
 
 android {
     namespace = "com.example.pulseledger"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.example.pulseledger"
         minSdk = 28          // Health Connect needs API 28+; on 34+ it's built into the OS
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1"
     }
