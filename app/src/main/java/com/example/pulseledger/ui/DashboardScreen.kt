@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.pulseledger.data.db.BpReading
+import com.example.pulseledger.data.db.DailySummary
 import com.example.pulseledger.domain.Calculations
 import java.time.Instant
 import java.time.ZoneId
@@ -161,7 +162,18 @@ private fun PressureTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
 @Composable
 private fun HistoryTab(ui: DashboardViewModel.Ui) {
     val vm: DashboardViewModel = viewModel()
+    var range by remember { mutableStateOf(Range.ALL) }
+    var selectedDay by remember { mutableStateOf<DailySummary?>(null) }
     val insights = remember(ui.summaries) { mineInsights(ui.summaries) }
+
+    selectedDay?.let { DayDetailSheet(it, onDismiss = { selectedDay = null }) }
+
+    val now = System.currentTimeMillis()
+    val scoped = remember(ui.summaries, range) {
+        if (range == Range.ALL) ui.summaries
+        else ui.summaries.filter { it.dayEpoch >= now - range.days * 86_400_000L }
+    }
+
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -169,41 +181,60 @@ private fun HistoryTab(ui: DashboardViewModel.Ui) {
     ) {
         item { Header(ui, vm) }
         if (ui.summaries.size < 30) {
-            item {
-                Panel {
-                    Text("Import your Samsung Health export to unlock years of history here.",
-                        color = PL.Soft, fontSize = 13.sp)
+            item { Panel { Text("Import your Samsung Health export to unlock years of history here.",
+                color = PL.Soft, fontSize = 13.sp) } }
+            return@LazyColumn
+        }
+
+        // Range scope chips
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Range.entries.forEach { r ->
+                    FilterChip(
+                        selected = range == r, onClick = { range = r },
+                        label = { Text(r.label, fontSize = 13.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = PL.CardUp, selectedLabelColor = PL.Txt,
+                            containerColor = PL.Card, labelColor = PL.Dim,
+                        ),
+                    )
                 }
             }
-        } else {
-            if (insights.isNotEmpty()) items(insights) { ins ->
-                Panel {
-                    Row(verticalAlignment = Alignment.Top) {
-                        Text(ins.emoji, fontSize = 22.sp, modifier = Modifier.padding(end = 12.dp))
-                        Column {
-                            Text(ins.title, color = PL.Txt, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(2.dp))
-                            Text(ins.body, color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
-                        }
+        }
+
+        if (insights.isNotEmpty() && range == Range.ALL) items(insights) { ins ->
+            Panel {
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(ins.emoji, fontSize = 22.sp, modifier = Modifier.padding(end = 12.dp))
+                    Column {
+                        Text(ins.title, color = PL.Txt, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(2.dp))
+                        Text(ins.body, color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
                     }
                 }
             }
-            item {
-                Panel {
-                    Label("YOUR ARCHIVE · MONTHLY AVERAGES · SHARED TIMELINE")
-                    val xMin = ui.summaries.first().dayEpoch
-                    val xMax = ui.summaries.last().dayEpoch
-                    HistoryChart("STEPS / DAY", ui.summaries, xMin, xMax, PL.Charge, "") { it.steps?.toDouble() }
-                    HistoryChart("RESTING HEART RATE", ui.summaries, xMin, xMax, PL.Sys, "bpm") { it.restingHr?.toDouble() }
-                    HistoryChart("SLEEP", ui.summaries, xMin, xMax, PL.Sleep, "min") { it.sleepMinutes?.toDouble() }
-                    HistoryChart("STRESS", ui.summaries, xMin, xMax, PL.Drain, "") { it.stressAvg }
-                    HistoryChart("EXERCISE", ui.summaries, xMin, xMax, PL.Dia, "min") { it.exerciseMin?.toDouble() }
-                    HistoryChart("WEIGHT", ui.summaries, xMin, xMax, PL.Gold, "lb") { it.weightKg?.times(2.20462) }
-                    SharedAxisLabels(xMin, xMax)
-                    val total = ui.summaries.sumOf { (it.steps ?: 0).toLong() }
+        }
+
+        item {
+            Panel {
+                Label("TAP ANY POINT TO SEE THAT DAY")
+                if (scoped.size < 2) {
+                    Text("Not enough data in this range.", color = PL.Soft, fontSize = 13.sp)
+                } else {
+                    val xMin = scoped.first().dayEpoch
+                    val xMax = scoped.last().dayEpoch
+                    val tap: (DailySummary) -> Unit = { selectedDay = it }
+                    FramedChart("STEPS / DAY", scoped, xMin, xMax, range, PL.Charge, "", onTapDay = tap) { it.steps?.toDouble() }
+                    FramedChart("RESTING HEART RATE", scoped, xMin, xMax, range, PL.Sys, "bpm", onTapDay = tap) { it.restingHr?.toDouble() }
+                    FramedChart("SLEEP", scoped, xMin, xMax, range, PL.Sleep, "", fmtValue = { "%dh%02dm".format((it/60).toInt(), (it%60).toInt()) }, onTapDay = tap) { it.sleepMinutes?.toDouble() }
+                    FramedChart("STRESS", scoped, xMin, xMax, range, PL.Drain, "", onTapDay = tap) { it.stressAvg }
+                    FramedChart("EXERCISE", scoped, xMin, xMax, range, PL.Dia, "min", onTapDay = tap) { it.exerciseMin?.toDouble() }
+                    FramedChart("WEIGHT", scoped, xMin, xMax, range, PL.Gold, "lb", fmtValue = { "%.0f".format(it) }, onTapDay = tap) { it.weightKg?.times(2.20462) }
+                    AxisLabels(xMin, xMax)
+                    val total = scoped.sumOf { (it.steps ?: 0).toLong() }
                     if (total > 0) {
                         Spacer(Modifier.height(8.dp))
-                        Text("Lifetime: %,d steps · ≈ %,d miles".format(total, total / 2100),
+                        Text("This range: %,d steps · ≈ %,d miles".format(total, total / 2100),
                             color = PL.Soft, fontSize = 12.sp)
                     }
                 }
