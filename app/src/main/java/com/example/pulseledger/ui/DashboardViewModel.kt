@@ -110,7 +110,24 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 // Samsung Health export file?
                 SamsungImporter.parse(ByteArrayInputStream(bytes))?.let { sam ->
                     if (sam.summaries.isNotEmpty()) {
-                        Db.get(getApplication()).dao().upsertSummaries(sam.summaries)
+                        val dao = Db.get(getApplication()).dao()
+                        val existing = sam.summaries.map { it.dayEpoch }.chunked(900)
+                            .flatMap { dao.summariesByDays(it) }.associateBy { it.dayEpoch }
+                        val merged = sam.summaries.map { new ->
+                            existing[new.dayEpoch]?.let { old ->
+                                old.copy(
+                                    amSystolic = new.amSystolic ?: old.amSystolic,
+                                    amDiastolic = new.amDiastolic ?: old.amDiastolic,
+                                    pmSystolic = new.pmSystolic ?: old.pmSystolic,
+                                    pmDiastolic = new.pmDiastolic ?: old.pmDiastolic,
+                                    restingHr = new.restingHr ?: old.restingHr,
+                                    hrvRmssd = new.hrvRmssd ?: old.hrvRmssd,
+                                    sleepMinutes = new.sleepMinutes ?: old.sleepMinutes,
+                                    steps = new.steps ?: old.steps,
+                                )
+                            } ?: new
+                        }
+                        dao.upsertSummaries(merged)
                         _ui.value = _ui.value.copy(notice = "Imported ${sam.summaries.size} days of ${sam.kind}" +
                             if (sam.skipped > 0) " (${sam.skipped} rows skipped)" else "")
                         load(); return@launch
