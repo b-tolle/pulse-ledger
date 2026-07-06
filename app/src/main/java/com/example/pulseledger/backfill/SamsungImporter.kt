@@ -2,88 +2,114 @@ package com.example.pulseledger.backfill
 
 import com.example.pulseledger.data.db.DailySummary
 import java.io.InputStream
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 /**
- * Imports CSVs from Samsung Health's "Download personal data" export.
- *
- * Samsung's format quirks handled here:
- *  - Line 1 is a metadata line like "com.samsung.shealth.tracker.pedometer_day_summary,6,3"
- *    (real column headers are on line 2)
- *  - Timestamps are epoch milliseconds (sometimes with a separate time_offset column)
- *
- * Supported files (auto-detected from the metadata/header line):
- *  - pedometer_day_summary  → daily step totals (this is the years-of-steps one)
- *  - tracker.heart_rate     → resting-ish HR samples, folded to a daily min
- *  - sleep                  → nightly sleep duration
+ * Importer for Samsung Health "Download personal data" CSVs.
+ * Logic validated against real exports (2017–2026):
+ *  - Line 1 = metadata ("com.samsung.shealth.tracker.pedometer_day_summary,7000107,7"), may start with BOM
+ *  - Line 2 = headers, often prefixed ("com.samsung.health.heart_rate.start_time") → match on the last dot-segment
+ *  - Timestamps = "yyyy-MM-dd HH:mm:ss.SSS" in UTC, with a separate time_offset column ("UTC-0500")
+ *  - pedometer day_time = epoch-millis of the day; several rows per day (devices) → take max
  */
 object SamsungImporter {
 
     data class Result(val summaries: List<DailySummary>, val kind: String, val skipped: Int)
 
+    private const val DAY = 86_400_000L
+
     fun parse(stream: InputStream): Result? {
         val lines = stream.bufferedReader().readLines().filter { it.isNotBlank() }
-        if (lines.size < 2) return null
-        val meta = lines[0].lowercase()
-        val headerLine = if (meta.startsWith("com.samsung")) 1 else 0
-        val header = lines[headerLine].split(',').map { it.trim().lowercase() }
-        val rows = lines.drop(headerLine + 1)
+        if (lines.size < 3) return null
+        val meta = lines[0].removePrefix("\uFEFF").lowercase()
+        if (!meta.startsWith("com.samsung")) return null
+        val header = lines[1].split(',').map { it.trim() }
+        val rows = lines.drop(2)
 
-        fun col(vararg keys: String) = header.indexOfFirst { h -> keys.any { h == it || h.contains(it) } }
-        val dayMs = 86_400_000L
-        fun dayOf(ms: Long) = ms - ms % dayMs
+        fun col(name: String): Int = header.indexOfFirst { it.substringAfterLast('.').lowercase() == name }
 
         return when {
-            meta.contains("pedometer_day_summary") || (col("step_count") >= 0 && col("day_time") >= 0) -> {
-                val iDay = col("day_time"); val iSteps = col("step_count"); val iSource = col("source_type")
-                var skipped = 0
-                // Samsung writes one row per source per day; keep the max per day (dedupes phone+watch overlap)
-                val perDay = HashMap<Long, Int>()
-                for (r in rows) {
-                    val c = r.split(',')
-                    val day = c.getOrNull(iDay)?.trim()?.toLongOrNull()?.let(::dayOf)
-                    val steps = c.getOrNull(iSteps)?.trim()?.toDoubleOrNull()?.toInt()
-                    if (day == null || steps == null || steps <= 0) { skipped++; continue }
-                    // ignore aggregated "combined" duplicates conservatively via max()
-                    perDay[day] = maxOf(perDay[day] ?: 0, steps)
-                    if (iSource >= 0) Unit
-                }
-                Result(perDay.map { DailySummary(it.key, null, null, null, null, null, null, null, it.value) }, "steps", skipped)
-            }
-
-            meta.contains("heart_rate") || col("heart_rate") >= 0 -> {
-                val iHr = col("heart_rate"); val iT = col("start_time", "create_time")
-                var skipped = 0
-                val perDayMin = HashMap<Long, Int>()
-                for (r in rows) {
-                    val c = r.split(',')
-                    val t = c.getOrNull(iT)?.trim()?.toLongOrNull()?.let(::dayOf)
-                    val hr = c.getOrNull(iHr)?.trim()?.toDoubleOrNull()?.toInt()
-                    if (t == null || hr == null || hr < 30 || hr > 230) { skipped++; continue }
-                    perDayMin[t] = minOf(perDayMin[t] ?: 999, hr)   // daily min ≈ resting proxy
-                }
-                Result(perDayMin.map { DailySummary(it.key, null, null, null, null, it.value, null, null, null) }, "heart rate", skipped)
-            }
-
-            meta.contains("sleep") || (col("sleep_duration") >= 0 || (col("start_time") >= 0 && col("end_time") >= 0)) -> {
-                val iStart = col("start_time"); val iEnd = col("end_time"); val iDur = col("sleep_duration")
-                var skipped = 0
-                val perDay = HashMap<Long, Int>()
-                for (r in rows) {
-                    val c = r.split(',')
-                    val start = c.getOrNull(iStart)?.trim()?.toLongOrNull()
-                    val minutes = when {
-                        iDur >= 0 -> c.getOrNull(iDur)?.trim()?.toDoubleOrNull()?.let { (it / 60_000).toInt() }
-                        start != null -> c.getOrNull(iEnd)?.trim()?.toLongOrNull()?.let { ((it - start) / 60_000).toInt() }
-                        else -> null
-                    }
-                    if (start == null || minutes == null || minutes !in 10..1200) { skipped++; continue }
-                    val day = dayOf(start)
-                    perDay[day] = (perDay[day] ?: 0) + minutes
-                }
-                Result(perDay.map { DailySummary(it.key, null, null, null, null, null, null, it.value, null) }, "sleep", skipped)
-            }
-
+            "pedometer_day_summary" in meta -> parseSteps(header, rows, ::col)
+            "tracker.heart_rate" in meta -> parseHr(rows, ::col)
+            "shealth.sleep" in meta -> parseSleep(rows, ::col)
             else -> null
         }
     }
+
+    private fun parseSteps(header: List<String>, rows: List<String>, col: (String) -> Int): Result {
+        val iSteps = col("step_count"); val iDay = col("day_time"); val iCreate = col("create_time")
+        if (iSteps < 0) return Result(emptyList(), "steps", rows.size)
+        var skipped = 0
+        val perDay = HashMap<Long, Int>()
+        for (r in rows) {
+            val c = r.split(',')
+            val steps = c.getOrNull(iSteps)?.trim()?.toDoubleOrNull()?.toInt()
+            val dayRaw = c.getOrNull(iDay)?.trim().orEmpty()
+            val day: Long? = when {
+                dayRaw.all { it.isDigit() } && dayRaw.length >= 12 -> dayRaw.toLong() / DAY * DAY
+                else -> parseUtc(c.getOrNull(iCreate), null)?.let { it / DAY * DAY }
+            }
+            if (steps == null || steps <= 0 || day == null) { skipped++; continue }
+            perDay[day] = maxOf(perDay[day] ?: 0, steps)
+        }
+        return Result(perDay.map { steps(it.key, it.value) }, "steps", skipped)
+    }
+
+    private fun parseHr(rows: List<String>, col: (String) -> Int): Result {
+        val iHr = col("heart_rate"); val iT = col("start_time"); val iOff = col("time_offset")
+        if (iHr < 0 || iT < 0) return Result(emptyList(), "heart rate", rows.size)
+        var skipped = 0
+        val perDayMin = HashMap<Long, Int>()
+        for (r in rows) {
+            val c = r.split(',')
+            val hr = c.getOrNull(iHr)?.trim()?.toDoubleOrNull()?.toInt()
+            val t = parseUtc(c.getOrNull(iT), c.getOrNull(iOff))
+            if (hr == null || t == null || hr !in 30..230) { skipped++; continue }
+            val day = t / DAY * DAY
+            perDayMin[day] = minOf(perDayMin[day] ?: 999, hr)
+        }
+        return Result(perDayMin.map { rhr(it.key, it.value) }, "heart rate", skipped)
+    }
+
+    private fun parseSleep(rows: List<String>, col: (String) -> Int): Result {
+        val iSt = col("start_time"); val iEn = col("end_time"); val iOff = col("time_offset")
+        if (iSt < 0 || iEn < 0) return Result(emptyList(), "sleep", rows.size)
+        var skipped = 0
+        val perDay = HashMap<Long, Int>()
+        for (r in rows) {
+            val c = r.split(',')
+            val st = parseUtc(c.getOrNull(iSt), c.getOrNull(iOff))
+            val en = parseUtc(c.getOrNull(iEn), c.getOrNull(iOff))
+            val mins = if (st != null && en != null) ((en - st) / 60_000).toInt() else null
+            if (st == null || mins == null || mins !in 10..1200) { skipped++; continue }
+            val day = st / DAY * DAY
+            perDay[day] = (perDay[day] ?: 0) + mins
+        }
+        return Result(perDay.map { sleep(it.key, it.value) }, "sleep", skipped)
+    }
+
+    /** Parses Samsung's UTC timestamp string, shifted by the record's own offset so days bucket in *your* local wall time. */
+    private fun parseUtc(s: String?, offset: String?): Long? {
+        val v = s?.trim().orEmpty()
+        if (v.isEmpty()) return null
+        if (v.all { it.isDigit() } && v.length >= 12) return v.toLong()
+        val fmt = if (v.length > 19) FMT_MS else FMT_S
+        val base = runCatching { synchronized(fmt) { fmt.parse(v.take(23))!!.time } }.getOrNull() ?: return null
+        val m = OFFSET.find(offset?.trim().orEmpty())
+        val shift = m?.let {
+            val sign = if (it.groupValues[1] == "+") 1 else -1
+            sign * (it.groupValues[2].toInt() * 3_600_000L + it.groupValues[3].toInt() * 60_000L)
+        } ?: 0L
+        return base + shift
+    }
+
+    private val OFFSET = Regex("UTC([+-])(\\d{2}):?(\\d{2})")
+    private val FMT_MS = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+    private val FMT_S = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+
+    private fun steps(day: Long, v: Int) = DailySummary(day, null, null, null, null, null, null, null, v)
+    private fun rhr(day: Long, v: Int) = DailySummary(day, null, null, null, null, v, null, null, null)
+    private fun sleep(day: Long, v: Int) = DailySummary(day, null, null, null, null, null, null, v, null)
 }
