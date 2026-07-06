@@ -160,6 +160,14 @@ private fun Dashboard(ui: DashboardViewModel.Ui, onRefresh: () -> Unit) {
                     Stat("7-day avg", ui.steps7dAvg?.toString() ?: "—", Modifier.weight(1f))
                     Stat("Resting HR", ui.restingHr?.let { "$it bpm" } ?: "—", Modifier.weight(1f))
                 }
+                if (ui.historyDays > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "History: ${ui.historyDays} days of steps imported" +
+                            (ui.historySince?.let { " · back to ${fmtDay(it)}" } ?: ""),
+                        color = Ok, fontSize = 11.sp,
+                    )
+                }
                 if (ui.stepsToday == null) {
                     Spacer(Modifier.height(6.dp))
                     Text(
@@ -266,6 +274,10 @@ private fun AddReadingDialog(onDismiss: () -> Unit, onSave: (Int, Int, Int?) -> 
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Soft) } },
     )
 }
+
+private fun fmtDay(epoch: Long): String =
+    DateTimeFormatter.ofPattern("MMM yyyy").withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(epoch))
 
 private fun fmtTime(epoch: Long): String =
     DateTimeFormatter.ofPattern("MMM d · h:mm a")

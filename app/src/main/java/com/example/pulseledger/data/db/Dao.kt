@@ -16,6 +16,12 @@ interface HealthDao {
 
     @Query("SELECT * FROM daily_summary WHERE dayEpoch >= :fromDay ORDER BY dayEpoch")
     fun summariesSince(fromDay: Long): Flow<List<DailySummary>>
+
+    @Query("SELECT COUNT(*) FROM daily_summary WHERE steps IS NOT NULL")
+    suspend fun stepDaysCount(): Int
+
+    @Query("SELECT MIN(dayEpoch) FROM daily_summary WHERE steps IS NOT NULL")
+    suspend fun earliestStepDay(): Long?
 }
 
 @Database(
