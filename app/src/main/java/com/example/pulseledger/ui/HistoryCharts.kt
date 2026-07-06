@@ -17,26 +17,27 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** Monthly aggregation of one field across the whole imported history. */
-private fun monthly(
-    summaries: List<DailySummary>,
-    pick: (DailySummary) -> Double?,
-): List<Pair<Long, Double>> {
+private fun monthly(summaries: List<DailySummary>, pick: (DailySummary) -> Double?): List<Pair<Long, Double>> {
     val zone = ZoneId.systemDefault()
     val byMonth = LinkedHashMap<Long, MutableList<Double>>()
     for (s in summaries) {
         val v = pick(s) ?: continue
         val d = Instant.ofEpochMilli(s.dayEpoch).atZone(zone).toLocalDate()
-        val key = d.withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        byMonth.getOrPut(key) { mutableListOf() }.add(v)
+        byMonth.getOrPut(d.withDayOfMonth(1).atStartOfDay(zone).toInstant().toEpochMilli()) { mutableListOf() }.add(v)
     }
     return byMonth.map { (k, v) -> k to v.average() }.sortedBy { it.first }
 }
 
+/**
+ * One chart on a SHARED time axis: every chart in the stack spans the same
+ * xMin..xMax, so 2019 is at the same horizontal position everywhere.
+ * Gaps (no data for >45 days, e.g. the watchless years) are drawn as breaks.
+ */
 @Composable
 fun HistoryChart(
     title: String,
     summaries: List<DailySummary>,
+    xMin: Long, xMax: Long,
     color: Color,
     unit: String,
     pick: (DailySummary) -> Double?,
@@ -46,28 +47,38 @@ fun HistoryChart(
     val lo = points.minOf { it.second }
     val hi = points.maxOf { it.second }
     val latest = points.last().second
-    val fmt = DateTimeFormatter.ofPattern("MMM yy").withZone(ZoneId.systemDefault())
 
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
         Row {
-            Text(title, color = Color(0xFF8CA0BE), fontSize = 11.sp,
-                fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp, modifier = Modifier.weight(1f))
-            Text("%,.0f %s".format(latest, unit), color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(title, color = PL.Soft, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                letterSpacing = 1.5.sp, modifier = Modifier.weight(1f))
+            Text("%,.0f %s".format(latest, unit).trim(), color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.height(6.dp))
-        Canvas(Modifier.fillMaxWidth().height(64.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(56.dp)) {
             val w = size.width; val h = size.height
-            val n = points.size
-            fun x(i: Int) = w * i / (n - 1)
+            fun x(t: Long) = w * (t - xMin).toFloat() / (xMax - xMin).toFloat()
             fun y(v: Double) = (h - 6f) * (1f - ((v - lo) / (hi - lo + 1e-9)).toFloat()) + 3f
             val path = Path()
-            points.forEachIndexed { i, p -> if (i == 0) path.moveTo(x(0), y(p.second)) else path.lineTo(x(i), y(p.second)) }
+            var prev: Long? = null
+            for ((t, v) in points) {
+                if (prev == null || t - prev!! > 45L * 86_400_000L) path.moveTo(x(t), y(v))
+                else path.lineTo(x(t), y(v))
+                prev = t
+            }
             drawPath(path, color, style = Stroke(width = 4f))
-            drawCircle(color, radius = 6f, center = Offset(w, y(latest)))
+            drawCircle(color, radius = 6f, center = Offset(x(points.last().first), y(latest)))
         }
-        Row {
-            Text(fmt.format(Instant.ofEpochMilli(points.first().first)), color = Color(0xFF5B6D8A), fontSize = 9.sp, modifier = Modifier.weight(1f))
-            Text(fmt.format(Instant.ofEpochMilli(points.last().first)), color = Color(0xFF5B6D8A), fontSize = 9.sp)
-        }
+    }
+}
+
+@Composable
+fun SharedAxisLabels(xMin: Long, xMax: Long) {
+    val fmt = DateTimeFormatter.ofPattern("MMM yyyy").withZone(ZoneId.systemDefault())
+    Row {
+        Text(fmt.format(Instant.ofEpochMilli(xMin)), color = PL.Dim, fontSize = 9.sp, modifier = Modifier.weight(1f))
+        Text(fmt.format(Instant.ofEpochMilli((xMin + xMax) / 2)), color = PL.Dim, fontSize = 9.sp)
+        Text(fmt.format(Instant.ofEpochMilli(xMax)), color = PL.Dim, fontSize = 9.sp,
+            modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
     }
 }
