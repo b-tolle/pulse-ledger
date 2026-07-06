@@ -1,0 +1,33 @@
+package com.example.pulseledger.data.db
+
+import androidx.room.*
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface HealthDao {
+    @Upsert suspend fun upsertReadings(readings: List<BpReading>)
+    @Upsert suspend fun upsertSummaries(summaries: List<DailySummary>)
+
+    @Query("SELECT * FROM bp_readings ORDER BY epochMillis DESC LIMIT :limit")
+    fun latestReadings(limit: Int = 30): Flow<List<BpReading>>
+
+    @Query("SELECT * FROM daily_summary WHERE dayEpoch >= :fromDay ORDER BY dayEpoch")
+    fun summariesSince(fromDay: Long): Flow<List<DailySummary>>
+}
+
+@Database(
+    entities = [
+        BpReading::class, DailySummary::class,
+        com.example.pulseledger.meds.Med::class,
+        com.example.pulseledger.meds.DoseLog::class,
+        com.example.pulseledger.meds.PrivateEntry::class,
+        com.example.pulseledger.life.Place::class,
+        com.example.pulseledger.life.PlaceVisit::class,
+        com.example.pulseledger.life.TogetherSession::class,
+        com.example.pulseledger.env.EnvSample::class,
+    ],
+    version = 2,
+)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun dao(): HealthDao
+}
