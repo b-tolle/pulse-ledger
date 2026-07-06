@@ -312,6 +312,12 @@ private fun AvgCell(title: String, avg: Calculations.Averages?, modifier: Modifi
 }
 
 @Composable
+private fun Stat(title: String, value: String, modifier: Modifier) = Column(modifier) {
+    Text(title, color = PL.Soft, fontSize = 11.sp)
+    Text(value, color = PL.Txt, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
+}
+
+@Composable
 private fun ReadingRow(r: BpReading) = Row(
     Modifier.fillMaxWidth().background(PL.Card, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
