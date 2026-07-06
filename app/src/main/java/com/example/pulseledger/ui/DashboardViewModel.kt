@@ -111,48 +111,47 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun importOne(uri: Uri): String {
-        try {
-                val bytes = getApplication<Application>().contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                    ?: return "Couldn't open a file"
+        return try {
+            val bytes = getApplication<Application>().contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: return "Couldn't open a file"
 
-                // Samsung Health export file?
-                SamsungImporter.parse(ByteArrayInputStream(bytes))?.let { sam ->
-                    if (sam.summaries.isEmpty()) return "Recognized ${sam.kind} file but found no usable rows"
-                    if (sam.summaries.isNotEmpty()) {
-                        val dao = Db.get(getApplication()).dao()
-                        val existing = sam.summaries.map { it.dayEpoch }.chunked(900)
-                            .flatMap { dao.summariesByDays(it) }.associateBy { it.dayEpoch }
-                        val merged = sam.summaries.map { new ->
-                            existing[new.dayEpoch]?.let { old ->
-                                old.copy(
-                                    amSystolic = new.amSystolic ?: old.amSystolic,
-                                    amDiastolic = new.amDiastolic ?: old.amDiastolic,
-                                    pmSystolic = new.pmSystolic ?: old.pmSystolic,
-                                    pmDiastolic = new.pmDiastolic ?: old.pmDiastolic,
-                                    restingHr = new.restingHr ?: old.restingHr,
-                                    hrvRmssd = new.hrvRmssd ?: old.hrvRmssd,
-                                    sleepMinutes = new.sleepMinutes ?: old.sleepMinutes,
-                                    steps = new.steps ?: old.steps,
-                                    stressAvg = new.stressAvg ?: old.stressAvg,
-                                    exerciseMin = new.exerciseMin ?: old.exerciseMin,
-                                    weightKg = new.weightKg ?: old.weightKg,
-                                    ecgCount = new.ecgCount ?: old.ecgCount,
-                                )
-                            } ?: new
-                        }
-                        dao.upsertSummaries(merged)
-                        return "✓ ${sam.summaries.size} days of ${sam.kind}" +
-                            if (sam.skipped > 0) " (${sam.skipped} skipped)" else ""
+            val sam = SamsungImporter.parse(ByteArrayInputStream(bytes))
+            if (sam != null) {
+                if (sam.summaries.isEmpty()) return "Recognized ${sam.kind} file but found no usable rows"
+                val dao = Db.get(getApplication()).dao()
+                val existing = sam.summaries.map { it.dayEpoch }.chunked(900)
+                    .flatMap { dao.summariesByDays(it) }.associateBy { it.dayEpoch }
+                val merged = sam.summaries.map { new ->
+                    existing[new.dayEpoch]?.let { old ->
+                        old.copy(
+                            amSystolic = new.amSystolic ?: old.amSystolic,
+                            amDiastolic = new.amDiastolic ?: old.amDiastolic,
+                            pmSystolic = new.pmSystolic ?: old.pmSystolic,
+                            pmDiastolic = new.pmDiastolic ?: old.pmDiastolic,
+                            restingHr = new.restingHr ?: old.restingHr,
+                            hrvRmssd = new.hrvRmssd ?: old.hrvRmssd,
+                            sleepMinutes = new.sleepMinutes ?: old.sleepMinutes,
+                            steps = new.steps ?: old.steps,
+                            stressAvg = new.stressAvg ?: old.stressAvg,
+                            exerciseMin = new.exerciseMin ?: old.exerciseMin,
+                            weightKg = new.weightKg ?: old.weightKg,
+                            ecgCount = new.ecgCount ?: old.ecgCount,
+                        )
+                    } ?: new
                 }
-
-                val res = CsvImporter.parse(ByteArrayInputStream(bytes))
-                return if (res.readings.isEmpty()) "No BP readings found in one file"
-                else {
-                    Db.get(getApplication()).dao().upsertReadings(res.readings)
-                    "✓ ${res.readings.size} BP readings" + if (res.skipped > 0) " (${res.skipped} skipped)" else ""
-                }
-            } catch (t: Throwable) {
-                return "Import failed: ${t.message}"
+                dao.upsertSummaries(merged)
+                return "✓ ${sam.summaries.size} days of ${sam.kind}" +
+                    if (sam.skipped > 0) " (${sam.skipped} skipped)" else ""
             }
+
+            val res = CsvImporter.parse(ByteArrayInputStream(bytes))
+            if (res.readings.isEmpty()) "No BP readings found in one file"
+            else {
+                Db.get(getApplication()).dao().upsertReadings(res.readings)
+                "✓ ${res.readings.size} BP readings" + if (res.skipped > 0) " (${res.skipped} skipped)" else ""
+            }
+        } catch (t: Throwable) {
+            "Import failed: ${t.message}"
+        }
     }
 }
