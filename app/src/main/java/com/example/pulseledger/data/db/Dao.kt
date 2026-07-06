@@ -11,6 +11,9 @@ interface HealthDao {
     @Query("SELECT * FROM bp_readings ORDER BY epochMillis DESC LIMIT :limit")
     fun latestReadings(limit: Int): Flow<List<BpReading>>
 
+    @Query("SELECT * FROM bp_readings ORDER BY epochMillis DESC LIMIT :limit")
+    suspend fun latestReadingsOnce(limit: Int): List<BpReading>
+
     @Query("SELECT * FROM daily_summary WHERE dayEpoch >= :fromDay ORDER BY dayEpoch")
     fun summariesSince(fromDay: Long): Flow<List<DailySummary>>
 }

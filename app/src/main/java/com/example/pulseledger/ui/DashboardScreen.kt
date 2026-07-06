@@ -14,6 +14,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.pulseledger.data.db.BpReading
 import com.example.pulseledger.domain.Calculations
@@ -68,6 +70,14 @@ private fun Center(msg: String) = Box(Modifier.fillMaxSize().padding(24.dp), con
 
 @Composable
 private fun Dashboard(ui: DashboardViewModel.Ui, onRefresh: () -> Unit) {
+    val vm: DashboardViewModel = viewModel()
+    var showAdd by remember { mutableStateOf(false) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { vm.importCsv(it) }
+    }
+    if (showAdd) AddReadingDialog(onDismiss = { showAdd = false }, onSave = { s2, d, p2 ->
+        showAdd = false; vm.addManual(s2, d, p2)
+    })
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -86,6 +96,19 @@ private fun Dashboard(ui: DashboardViewModel.Ui, onRefresh: () -> Unit) {
         }
 
         ui.error?.let { item { Panel { Text("Couldn't read Health Connect: $it", color = Warn, fontSize = 13.sp) } } }
+        ui.notice?.let { item { Panel { Text(it, color = Ok, fontSize = 13.sp) } } }
+
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { showAdd = true }, modifier = Modifier.weight(1f)) {
+                    Text("+ Add reading", color = Dia)
+                }
+                OutlinedButton(
+                    onClick = { picker.launch(arrayOf("text/*", "text/csv", "application/octet-stream", "text/comma-separated-values")) },
+                    modifier = Modifier.weight(1f),
+                ) { Text("Import CSV", color = Dia) }
+            }
+        }
 
         // ── Latest blood pressure ─────────────────────────────
         item {
@@ -212,6 +235,36 @@ private fun ReadingRow(r: BpReading) = Row(
 ) {
     Text(fmtTime(r.epochMillis), color = Soft, fontSize = 12.sp, modifier = Modifier.weight(1f))
     Mono("${r.systolic}", 16.sp, Sys); Mono("/", 13.sp, Soft); Mono("${r.diastolic}", 16.sp, Dia)
+}
+
+@Composable
+private fun AddReadingDialog(onDismiss: () -> Unit, onSave: (Int, Int, Int?) -> Unit) {
+    var sys by remember { mutableStateOf("") }
+    var dia by remember { mutableStateOf("") }
+    var pulse by remember { mutableStateOf("") }
+    val valid = sys.toIntOrNull()?.let { it in 60..260 } == true &&
+        dia.toIntOrNull()?.let { it in 30..200 } == true
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardUp,
+        title = { Text("Add blood pressure", color = Txt) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = sys, onValueChange = { sys = it.filter(Char::isDigit).take(3) },
+                    label = { Text("Systolic") }, singleLine = true)
+                OutlinedTextField(value = dia, onValueChange = { dia = it.filter(Char::isDigit).take(3) },
+                    label = { Text("Diastolic") }, singleLine = true)
+                OutlinedTextField(value = pulse, onValueChange = { pulse = it.filter(Char::isDigit).take(3) },
+                    label = { Text("Pulse (optional)") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = valid, onClick = { onSave(sys.toInt(), dia.toInt(), pulse.toIntOrNull()) }) {
+                Text("Save", color = if (valid) Ok else Soft)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Soft) } },
+    )
 }
 
 private fun fmtTime(epoch: Long): String =

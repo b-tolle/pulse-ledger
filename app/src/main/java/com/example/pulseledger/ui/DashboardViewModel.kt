@@ -3,8 +3,11 @@ package com.example.pulseledger.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.net.Uri
+import com.example.pulseledger.data.CsvImporter
 import com.example.pulseledger.data.HealthConnectManager
 import com.example.pulseledger.data.db.BpReading
+import com.example.pulseledger.data.db.Db
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -20,6 +23,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val steps7dAvg: Long? = null,
         val restingHr: Long? = null,
         val error: String? = null,
+        val notice: String? = null,
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -42,7 +46,12 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                         pulse = null,
                         source = "health_connect",
                     )
-                }.sortedByDescending { it.epochMillis }
+                }
+
+                val local = Db.get(getApplication()).dao().latestReadingsOnce(5000)
+                val merged = (bp + local)
+                    .distinctBy { it.epochMillis / 60000 }   // dedupe to the minute
+                    .sortedByDescending { it.epochMillis }
 
                 val steps = hc.readSteps(from, now)
                 val dayMs = 86_400_000L
@@ -59,15 +68,45 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val rhr = hc.readRestingHeartRate(from, now)
                     .maxByOrNull { it.time }?.beatsPerMinute
 
-                _ui.value = Ui(
+                _ui.value = _ui.value.copy(
                     loading = false,
-                    readings = bp,
+                    readings = merged,
                     stepsToday = today,
                     steps7dAvg = avg7,
                     restingHr = rhr,
                 )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(loading = false, error = t.message ?: "read failed")
+            }
+        }
+    }
+
+    fun addManual(sys: Int, dia: Int, pulse: Int?) {
+        viewModelScope.launch {
+            Db.get(getApplication()).dao().upsertReadings(listOf(
+                BpReading(System.currentTimeMillis(), sys, dia, pulse, "manual")
+            ))
+            _ui.value = _ui.value.copy(notice = "Saved $sys/$dia")
+            load()
+        }
+    }
+
+    fun importCsv(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val res = getApplication<Application>().contentResolver.openInputStream(uri)?.use {
+                    CsvImporter.parse(it)
+                }
+                if (res == null || res.readings.isEmpty()) {
+                    _ui.value = _ui.value.copy(notice = "No readings found in that file")
+                } else {
+                    Db.get(getApplication()).dao().upsertReadings(res.readings)
+                    _ui.value = _ui.value.copy(notice = "Imported ${res.readings.size} readings" +
+                        if (res.skipped > 0) " (${res.skipped} rows skipped)" else "")
+                    load()
+                }
+            } catch (t: Throwable) {
+                _ui.value = _ui.value.copy(notice = "Import failed: ${t.message}")
             }
         }
     }
