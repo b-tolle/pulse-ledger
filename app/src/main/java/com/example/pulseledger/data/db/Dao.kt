@@ -38,7 +38,7 @@ interface HealthDao {
         com.example.pulseledger.life.TogetherSession::class,
         com.example.pulseledger.env.EnvSample::class,
     ],
-    version = 2,
+    version = 3,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): HealthDao

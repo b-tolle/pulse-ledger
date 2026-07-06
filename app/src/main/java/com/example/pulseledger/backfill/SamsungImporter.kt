@@ -34,6 +34,12 @@ object SamsungImporter {
             "pedometer_day_summary" in meta -> parseSteps(header, rows, ::col)
             "tracker.heart_rate" in meta -> parseHr(rows, ::col)
             "shealth.sleep" in meta -> parseSleep(rows, ::col)
+            "shealth.stress" in meta -> parseDailyAvg(rows, ::col, "score", "stress") { day, v ->
+                DailySummary(day, null, null, null, null, null, null, null, null, stressAvg = v) }
+            "shealth.exercise" in meta -> parseExercise(rows, ::col)
+            "health.weight" in meta -> parseDailyAvg(rows, ::col, "weight", "weight") { day, v ->
+                DailySummary(day, null, null, null, null, null, null, null, null, weightKg = v) }
+            "health.ecg" in meta -> parseEcg(rows, ::col)
             else -> null
         }
     }
@@ -103,6 +109,57 @@ object SamsungImporter {
             sign * (it.groupValues[2].toInt() * 3_600_000L + it.groupValues[3].toInt() * 60_000L)
         } ?: 0L
         return base + shift
+    }
+
+    /** Generic: daily average of a numeric column (stress score, weight). */
+    private fun parseDailyAvg(
+        rows: List<String>, col: (String) -> Int, valueName: String, kind: String,
+        make: (Long, Double) -> DailySummary,
+    ): Result {
+        val iV = col(valueName); val iT = col("start_time"); val iOff = col("time_offset")
+        if (iV < 0 || iT < 0) return Result(emptyList(), kind, rows.size)
+        var skipped = 0
+        val sums = HashMap<Long, Pair<Double, Int>>()
+        for (r in rows) {
+            val c = r.split(',')
+            val v = c.getOrNull(iV)?.trim()?.toDoubleOrNull()
+            val t = parseUtc(c.getOrNull(iT), c.getOrNull(iOff))
+            if (v == null || v <= 0.0 || t == null) { skipped++; continue }
+            val day = t / DAY * DAY
+            val (sum, n) = sums[day] ?: (0.0 to 0)
+            sums[day] = (sum + v) to (n + 1)
+        }
+        return Result(sums.map { (day, p) -> make(day, p.first / p.second) }, kind, skipped)
+    }
+
+    private fun parseExercise(rows: List<String>, col: (String) -> Int): Result {
+        val iDur = col("duration"); val iT = col("start_time"); val iOff = col("time_offset")
+        if (iDur < 0 || iT < 0) return Result(emptyList(), "exercise", rows.size)
+        var skipped = 0
+        val perDay = HashMap<Long, Int>()
+        for (r in rows) {
+            val c = r.split(',')
+            val mins = c.getOrNull(iDur)?.trim()?.toDoubleOrNull()?.let { (it / 60_000).toInt() }
+            val t = parseUtc(c.getOrNull(iT), c.getOrNull(iOff))
+            if (mins == null || mins !in 1..600 || t == null) { skipped++; continue }
+            val day = t / DAY * DAY
+            perDay[day] = (perDay[day] ?: 0) + mins
+        }
+        return Result(perDay.map { DailySummary(it.key, null, null, null, null, null, null, null, null, exerciseMin = it.value) }, "exercise", skipped)
+    }
+
+    private fun parseEcg(rows: List<String>, col: (String) -> Int): Result {
+        val iT = col("start_time"); val iOff = col("time_offset")
+        if (iT < 0) return Result(emptyList(), "ECG sessions", rows.size)
+        var skipped = 0
+        val perDay = HashMap<Long, Int>()
+        for (r in rows) {
+            val c = r.split(',')
+            val t = parseUtc(c.getOrNull(iT), c.getOrNull(iOff)) ?: run { skipped++; null } ?: continue
+            val day = t / DAY * DAY
+            perDay[day] = (perDay[day] ?: 0) + 1
+        }
+        return Result(perDay.map { DailySummary(it.key, null, null, null, null, null, null, null, null, ecgCount = it.value) }, "ECG sessions", skipped)
     }
 
     private val OFFSET = Regex("UTC([+-])(\\d{2}):?(\\d{2})")

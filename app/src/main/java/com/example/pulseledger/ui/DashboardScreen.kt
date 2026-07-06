@@ -72,8 +72,8 @@ private fun Center(msg: String) = Box(Modifier.fillMaxSize().padding(24.dp), con
 private fun Dashboard(ui: DashboardViewModel.Ui, onRefresh: () -> Unit) {
     val vm: DashboardViewModel = viewModel()
     var showAdd by remember { mutableStateOf(false) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { vm.importCsv(it) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) vm.importCsvs(uris)
     }
     if (showAdd) AddReadingDialog(onDismiss = { showAdd = false }, onSave = { s2, d, p2 ->
         showAdd = false; vm.addManual(s2, d, p2)
@@ -106,7 +106,7 @@ private fun Dashboard(ui: DashboardViewModel.Ui, onRefresh: () -> Unit) {
                 OutlinedButton(
                     onClick = { picker.launch(arrayOf("text/*", "text/csv", "application/octet-stream", "text/comma-separated-values")) },
                     modifier = Modifier.weight(1f),
-                ) { Text("Import CSV", color = Dia) }
+                ) { Text("Import CSVs", color = Dia) }
             }
         }
 

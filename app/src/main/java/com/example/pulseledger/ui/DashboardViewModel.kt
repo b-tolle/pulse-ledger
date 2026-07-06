@@ -101,14 +101,23 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun importCsv(uri: Uri) {
+    fun importCsvs(uris: List<Uri>) {
         viewModelScope.launch {
-            try {
+            val messages = ArrayList<String>()
+            for (uri in uris) messages += importOne(uri)
+            _ui.value = _ui.value.copy(notice = messages.joinToString("\n"))
+            load()
+        }
+    }
+
+    private suspend fun importOne(uri: Uri): String {
+        try {
                 val bytes = getApplication<Application>().contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                if (bytes == null) { _ui.value = _ui.value.copy(notice = "Couldn't open that file"); return@launch }
+                    ?: return "Couldn't open a file"
 
                 // Samsung Health export file?
                 SamsungImporter.parse(ByteArrayInputStream(bytes))?.let { sam ->
+                    if (sam.summaries.isEmpty()) return "Recognized ${sam.kind} file but found no usable rows"
                     if (sam.summaries.isNotEmpty()) {
                         val dao = Db.get(getApplication()).dao()
                         val existing = sam.summaries.map { it.dayEpoch }.chunked(900)
@@ -124,28 +133,26 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                                     hrvRmssd = new.hrvRmssd ?: old.hrvRmssd,
                                     sleepMinutes = new.sleepMinutes ?: old.sleepMinutes,
                                     steps = new.steps ?: old.steps,
+                                    stressAvg = new.stressAvg ?: old.stressAvg,
+                                    exerciseMin = new.exerciseMin ?: old.exerciseMin,
+                                    weightKg = new.weightKg ?: old.weightKg,
+                                    ecgCount = new.ecgCount ?: old.ecgCount,
                                 )
                             } ?: new
                         }
                         dao.upsertSummaries(merged)
-                        _ui.value = _ui.value.copy(notice = "Imported ${sam.summaries.size} days of ${sam.kind}" +
-                            if (sam.skipped > 0) " (${sam.skipped} rows skipped)" else "")
-                        load(); return@launch
-                    }
+                        return "✓ ${sam.summaries.size} days of ${sam.kind}" +
+                            if (sam.skipped > 0) " (${sam.skipped} skipped)" else ""
                 }
 
                 val res = CsvImporter.parse(ByteArrayInputStream(bytes))
-                if (res == null || res.readings.isEmpty()) {
-                    _ui.value = _ui.value.copy(notice = "No readings found in that file")
-                } else {
+                return if (res.readings.isEmpty()) "No BP readings found in one file"
+                else {
                     Db.get(getApplication()).dao().upsertReadings(res.readings)
-                    _ui.value = _ui.value.copy(notice = "Imported ${res.readings.size} readings" +
-                        if (res.skipped > 0) " (${res.skipped} rows skipped)" else "")
-                    load()
+                    "✓ ${res.readings.size} BP readings" + if (res.skipped > 0) " (${res.skipped} skipped)" else ""
                 }
             } catch (t: Throwable) {
-                _ui.value = _ui.value.copy(notice = "Import failed: ${t.message}")
+                return "Import failed: ${t.message}"
             }
-        }
     }
 }

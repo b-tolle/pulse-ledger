@@ -22,4 +22,8 @@ data class DailySummary(
     val hrvRmssd: Double?,
     val sleepMinutes: Int?,
     val steps: Int?,
+    val stressAvg: Double? = null,
+    val exerciseMin: Int? = null,
+    val weightKg: Double? = null,
+    val ecgCount: Int? = null,
 )
