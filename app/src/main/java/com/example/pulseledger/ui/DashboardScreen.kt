@@ -198,7 +198,7 @@ private fun HistoryTab(ui: DashboardViewModel.Ui) {
                     HistoryChart("SLEEP", ui.summaries, xMin, xMax, PL.Sleep, "min") { it.sleepMinutes?.toDouble() }
                     HistoryChart("STRESS", ui.summaries, xMin, xMax, PL.Drain, "") { it.stressAvg }
                     HistoryChart("EXERCISE", ui.summaries, xMin, xMax, PL.Dia, "min") { it.exerciseMin?.toDouble() }
-                    HistoryChart("WEIGHT", ui.summaries, xMin, xMax, PL.Gold, "kg") { it.weightKg }
+                    HistoryChart("WEIGHT", ui.summaries, xMin, xMax, PL.Gold, "lb") { it.weightKg?.times(2.20462) }
                     SharedAxisLabels(xMin, xMax)
                     val total = ui.summaries.sumOf { (it.steps ?: 0).toLong() }
                     if (total > 0) {

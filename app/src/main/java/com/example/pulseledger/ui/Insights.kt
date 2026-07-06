@@ -28,10 +28,11 @@ fun mineInsights(s: List<DailySummary>): List<Insight> {
     val we = byDow[true]?.map { it.steps!!.toDouble() }?.average()
     if (wk != null && we != null) {
         val diff = ((we - wk) / wk * 100).toInt()
+        val weS = "%,.0f".format(we); val wkS = "%,.0f".format(wk)
         out += if (diff >= 0)
-            Insight("🌤", "Weekend walker", "You move $diff% more on weekends (%,.0f vs %,.0f steps).".format(we, wk))
+            Insight("🌤", "Weekend walker", "You move $diff% more on weekends ($weS vs $wkS steps).")
         else
-            Insight("💼", "Weekday mover", "You move ${-diff}% more on weekdays (%,.0f vs %,.0f steps).".format(wk, we))
+            Insight("💼", "Weekday mover", "You move ${-diff}% more on weekdays ($wkS vs $weS steps).")
     }
 
     // Stress ↔ sleep correlation (same-day)
