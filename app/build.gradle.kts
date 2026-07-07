@@ -38,6 +38,7 @@ android {
 dependencies {
     // Health Connect
     implementation("androidx.health.connect:connect-client:1.1.0-rc02")
+    implementation("androidx.core:core-ktx:1.13.1")
 
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.09.03"))

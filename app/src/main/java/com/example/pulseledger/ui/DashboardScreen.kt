@@ -2,6 +2,10 @@ package com.example.pulseledger.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -81,27 +85,44 @@ fun DashboardScreen(
 /* ───────────────────────── Today ───────────────────────── */
 @Composable
 private fun TodayTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
-    val charge = remember(ui.summaries, ui.stepsToday) { computeCharge(ui.summaries, ui.stepsToday) }
+    val ctx = LocalContext.current
+    val calPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (it) vm.load()
+    }
+    val hasCal = ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+
+    val charge = remember(ui.summaries, ui.stepsToday, ui.calendar) {
+        computeCharge(ui.summaries, ui.stepsToday, ui.calendar?.eventCount, ui.calendar?.busyMinutes)
+    }
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 20.dp),
     ) {
         item { Header(ui, vm) }
+        item { Greeting(ui) }
         item {
             Panel {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     ChargeGauge(charge.value)
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(8.dp))
                     charge.contributors.forEach { (what, delta) ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                            Mono(if (delta > 0) "+$delta" else "$delta", 14.sp,
-                                if (delta > 0) PL.Charge else PL.Drain, Modifier.width(44.dp))
+                        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.width(44.dp)) {
+                                Mono(if (delta > 0) "+$delta" else "$delta", 14.sp, if (delta > 0) PL.Charge else PL.Drain)
+                            }
                             Text(what, color = PL.Txt, fontSize = 13.sp)
                         }
                     }
+                    if (!hasCal) {
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedButton(onClick = { calPerm.launch(Manifest.permission.READ_CALENDAR) },
+                            modifier = Modifier.fillMaxWidth()) {
+                            Text("Add calendar to the picture", color = PL.Dia, fontSize = 13.sp)
+                        }
+                    }
                     Text("HRV joins the formula when your Fitbit Air arrives",
-                        color = PL.Dim, fontSize = 10.5.sp, modifier = Modifier.padding(top = 6.dp))
+                        color = PL.Dim, fontSize = 10.5.sp, modifier = Modifier.padding(top = 8.dp))
                 }
             }
         }
@@ -116,6 +137,26 @@ private fun TodayTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
             }
         }
         item { LatestBpCard(ui) }
+    }
+}
+
+@Composable
+private fun Greeting(ui: DashboardViewModel.Ui) {
+    val hour = java.time.LocalTime.now().hour
+    val greeting = when { hour < 12 -> "Good morning"; hour < 18 -> "Good afternoon"; else -> "Good evening" }
+    val date = java.time.LocalDate.now()
+        .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d"))
+    val cal = ui.calendar
+    Column {
+        Text(greeting, color = PL.Txt, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        val sub = buildString {
+            append(date)
+            if (cal != null && cal.eventCount > 0) {
+                append("  ·  ${cal.eventCount} event${if (cal.eventCount>1) "s" else ""}")
+                if (cal.backToBack > 0) append(", ${cal.backToBack} back-to-back")
+            }
+        }
+        Text(sub, color = PL.Soft, fontSize = 13.sp)
     }
 }
 

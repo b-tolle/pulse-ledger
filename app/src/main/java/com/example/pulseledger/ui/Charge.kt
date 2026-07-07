@@ -25,7 +25,12 @@ data class ChargeResult(val value: Int, val contributors: List<Pair<String, Int>
  * Charge without a wearable yet: last night's sleep charges, today's
  * steps/exercise/stress drain. Gets smarter when the Fitbit Air adds HRV.
  */
-fun computeCharge(summaries: List<DailySummary>, stepsToday: Long?): ChargeResult {
+fun computeCharge(
+    summaries: List<DailySummary>,
+    stepsToday: Long?,
+    meetings: Int? = null,
+    busyMinutes: Int? = null,
+): ChargeResult {
     val now = System.currentTimeMillis()
     val recent = summaries.filter { it.dayEpoch >= now - 3 * 86_400_000L }
     val sleepMin = recent.lastOrNull { it.sleepMinutes != null }?.sleepMinutes
@@ -49,6 +54,12 @@ fun computeCharge(summaries: List<DailySummary>, stepsToday: Long?): ChargeResul
     stress?.let {
         val drain = (it / 4).toInt().coerceAtMost(15)
         if (drain > 0) { v -= drain; contributors += "Stress · avg %.0f".format(it) to -drain }
+    }
+    if (meetings != null && meetings > 0) {
+        val drain = (meetings * 2 + (busyMinutes ?: 0) / 60).coerceAtMost(18)
+        v -= drain
+        val hrs = (busyMinutes ?: 0) / 60
+        contributors += "Calendar · $meetings event${if (meetings>1) "s" else ""}, ${hrs}h booked" to -drain
     }
     return ChargeResult(v.coerceIn(5, 100), contributors)
 }
