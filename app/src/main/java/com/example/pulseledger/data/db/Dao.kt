@@ -28,6 +28,14 @@ interface HealthDao {
 
     @Query("SELECT MIN(dayEpoch) FROM daily_summary WHERE steps IS NOT NULL")
     suspend fun earliestStepDay(): Long?
+
+    @androidx.room.Upsert suspend fun upsertLocationDays(days: List<LocationDay>)
+
+    @Query("SELECT * FROM location_days WHERE dayEpoch = :day")
+    suspend fun locationDay(day: Long): LocationDay?
+
+    @Query("SELECT COUNT(*) FROM location_days")
+    suspend fun locationDayCount(): Int
 }
 
 @Database(
@@ -40,8 +48,9 @@ interface HealthDao {
         com.example.pulseledger.life.PlaceVisit::class,
         com.example.pulseledger.life.TogetherSession::class,
         com.example.pulseledger.env.EnvSample::class,
+        LocationDay::class,
     ],
-    version = 3,
+    version = 4,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): HealthDao

@@ -27,3 +27,12 @@ data class DailySummary(
     val weightKg: Double? = null,
     val ecgCount: Int? = null,
 )
+
+
+@androidx.room.Entity(tableName = "location_days")
+data class LocationDay(
+    @androidx.room.PrimaryKey val dayEpoch: Long,
+    val distanceMeters: Double,      // total distance moved that day
+    val placesJson: String,          // [{lat,lng,label,minutes}] clustered stays
+    val pointCount: Int,
+)

@@ -11,6 +11,7 @@ import com.example.pulseledger.data.db.DailySummary
 import com.example.pulseledger.life.CalendarReader
 import com.example.pulseledger.data.db.Db
 import com.example.pulseledger.backfill.SamsungImporter
+import com.example.pulseledger.backfill.LocationImporter
 import java.io.ByteArrayInputStream
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -117,6 +118,18 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         return try {
             val bytes = getApplication<Application>().contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: return "Couldn't open a file"
+
+            // Google location history (JSON)?
+            val head = String(bytes.copyOfRange(0, minOf(bytes.size, 400)))
+            if (head.contains("\"locations\"") || head.contains("timelineObjects") || head.contains("semanticSegments")) {
+                val days = LocationImporter.parse(ByteArrayInputStream(bytes))
+                if (days.isNotEmpty()) {
+                    Db.get(getApplication()).dao().upsertLocationDays(days)
+                    val totalKm = days.sumOf { it.distanceMeters } / 1000.0
+                    return "✓ ${days.size} days of location · ${"%,.0f".format(totalKm * 0.621371)} mi mapped"
+                }
+                return "Recognized a location file but found no usable points"
+            }
 
             val sam = SamsungImporter.parse(ByteArrayInputStream(bytes))
             if (sam != null) {
