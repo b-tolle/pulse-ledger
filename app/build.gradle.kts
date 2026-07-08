@@ -40,6 +40,9 @@ dependencies {
     implementation("androidx.health.connect:connect-client:1.1.0-rc02")
     implementation("androidx.core:core-ktx:1.13.1")
 
+    // OpenStreetMap — free street maps, no API key, no billing
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
+
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.09.03"))
     implementation("androidx.compose.material3:material3")

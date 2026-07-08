@@ -14,13 +14,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pulseledger.data.db.DailySummary
+import com.example.pulseledger.data.db.LocationDay
+import org.json.JSONArray
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DayDetailSheet(day: DailySummary, onDismiss: () -> Unit) {
+fun DayDetailSheet(day: DailySummary, location: LocationDay? = null, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val zone = ZoneId.systemDefault()
     val date = Instant.ofEpochMilli(day.dayEpoch).atZone(zone).toLocalDate()
@@ -59,6 +61,29 @@ fun DayDetailSheet(day: DailySummary, onDismiss: () -> Unit) {
                     if (extra.isNotEmpty()) Text("  $extra", color = PL.Dim, fontSize = 12.sp)
                 }
                 HorizontalDivider(color = PL.Line)
+            }
+
+            if (location != null && location.placesJson != "[]") {
+                Spacer(Modifier.height(16.dp))
+                Text("WHERE YOU WERE", color = PL.Soft, fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(8.dp))
+                PlacesMap(listOf(location), heightDp = 220)
+                Spacer(Modifier.height(8.dp))
+                val arr = runCatching { JSONArray(location.placesJson) }.getOrNull()
+                if (arr != null) for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val mins = o.optInt("minutes")
+                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(o.optString("label", "Place"), color = PL.Txt, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Text(if (mins >= 60) "%dh %02dm".format(mins/60, mins%60) else "${mins}m",
+                            color = PL.Soft, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                    }
+                }
+                if (location.distanceMeters > 100) {
+                    Text("Traveled ≈ %.1f mi".format(location.distanceMeters / 1609.34),
+                        color = PL.Dim, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                }
             }
 
             Spacer(Modifier.height(20.dp))

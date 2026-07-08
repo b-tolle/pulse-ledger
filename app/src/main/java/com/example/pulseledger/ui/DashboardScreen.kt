@@ -234,7 +234,7 @@ private fun HistoryTab(ui: DashboardViewModel.Ui) {
     var selectedDay by remember { mutableStateOf<DailySummary?>(null) }
     val insights = remember(ui.summaries) { mineInsights(ui.summaries) }
 
-    selectedDay?.let { DayDetailSheet(it, onDismiss = { selectedDay = null }) }
+    selectedDay?.let { d -> DayDetailSheet(d, location = ui.locationDays[d.dayEpoch], onDismiss = { selectedDay = null }) }
 
     val now = System.currentTimeMillis()
     val scoped = remember(ui.summaries, range) {

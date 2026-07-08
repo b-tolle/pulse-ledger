@@ -36,6 +36,9 @@ interface HealthDao {
 
     @Query("SELECT COUNT(*) FROM location_days")
     suspend fun locationDayCount(): Int
+
+    @Query("SELECT * FROM location_days ORDER BY dayEpoch")
+    suspend fun allLocationDays(): List<LocationDay>
 }
 
 @Database(
