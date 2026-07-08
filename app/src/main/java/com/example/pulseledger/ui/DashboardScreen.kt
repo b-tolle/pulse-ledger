@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -273,12 +274,19 @@ private fun HistoryTab(ui: DashboardViewModel.Ui) {
             val recs = records(ui.summaries)
             if (recs.isNotEmpty()) item {
                 Panel(Modifier.entrance(0)) {
-                    Label("PERSONAL RECORDS")
+                    Label("PERSONAL RECORDS · TAP TO SEE THE DAY")
                     recs.forEach { r ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val day = r.dayEpoch?.let { ep -> ui.summaries.firstOrNull { it.dayEpoch == ep } }
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .clickable(enabled = day != null) { day?.let { selectedDay = it } }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(r.emoji, fontSize = 18.sp, modifier = Modifier.padding(end = 10.dp))
                             Text(r.label, color = PL.Soft, fontSize = 13.sp, modifier = Modifier.weight(1f))
                             Text(r.value, color = PL.Txt, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
+                            if (day != null) Text("  ›", color = PL.Dim, fontSize = 18.sp)
                         }
                     }
                 }

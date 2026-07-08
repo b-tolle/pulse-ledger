@@ -39,17 +39,21 @@ fun weeklyDigest(summaries: List<DailySummary>): WeekDigest? {
     )
 }
 
-data class Record(val emoji: String, val label: String, val value: String)
+data class Record(val emoji: String, val label: String, val value: String, val dayEpoch: Long?)
 
 fun records(summaries: List<DailySummary>): List<Record> {
     val out = ArrayList<Record>()
     summaries.filter { (it.steps ?: 0) > 0 }.maxByOrNull { it.steps!! }?.let {
-        out += Record("🏆", "Most steps", "%,d".format(it.steps))
+        out += Record("🏆", "Most steps", "%,d".format(it.steps), it.dayEpoch)
     }
-    summaries.mapNotNull { it.restingHr }.minOrNull()?.let { out += Record("💚", "Lowest RHR", "$it bpm") }
-    summaries.mapNotNull { it.sleepMinutes }.maxOrNull()?.let {
-        out += Record("🛌", "Longest sleep", "%dh %02dm".format(it / 60, it % 60))
+    summaries.filter { it.restingHr != null }.minByOrNull { it.restingHr!! }?.let {
+        out += Record("💚", "Lowest RHR", "${it.restingHr} bpm", it.dayEpoch)
     }
-    summaries.mapNotNull { it.exerciseMin }.maxOrNull()?.let { out += Record("🔥", "Biggest workout", "$it min") }
+    summaries.filter { it.sleepMinutes != null }.maxByOrNull { it.sleepMinutes!! }?.let {
+        out += Record("🛌", "Longest sleep", "%dh %02dm".format(it.sleepMinutes!! / 60, it.sleepMinutes!! % 60), it.dayEpoch)
+    }
+    summaries.filter { it.exerciseMin != null }.maxByOrNull { it.exerciseMin!! }?.let {
+        out += Record("🔥", "Biggest workout", "${it.exerciseMin} min", it.dayEpoch)
+    }
     return out
 }
