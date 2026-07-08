@@ -25,6 +25,9 @@ jobs:
           gradle-version: "8.11.1"
 
       - name: Build debug APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: "0.1.${{ github.run_number }}"
         run: |
           set -o pipefail
           gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
