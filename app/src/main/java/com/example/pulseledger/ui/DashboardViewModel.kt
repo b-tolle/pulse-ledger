@@ -61,14 +61,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     .distinctBy { it.epochMillis / 60000 }   // dedupe to the minute
                     .sortedByDescending { it.epochMillis }
 
-                val steps = hc.readSteps(from, now)
                 val dayMs = 86_400_000L
                 val todayStart = now.toEpochMilli() - now.toEpochMilli() % dayMs
-                val byDay = HashMap<Long, Long>()
-                for (s in steps) {
-                    val d = s.startTime.toEpochMilli() - s.startTime.toEpochMilli() % dayMs
-                    byDay[d] = (byDay[d] ?: 0L) + s.count
-                }
+                val byDay = hc.dailySteps(from, now)
                 val today = byDay[todayStart]
                 val last7 = byDay.filterKeys { it in (todayStart - 7 * dayMs) until todayStart }.values
                 val avg7 = if (last7.isEmpty()) null else last7.sum() / last7.size

@@ -4,7 +4,13 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
+import androidx.health.connect.client.aggregate.AggregationResult
+import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
+import java.time.LocalDateTime
+import java.time.Period
+import java.time.ZoneId
 import androidx.health.connect.client.time.TimeRangeFilter
 import java.time.Instant
 
@@ -47,6 +53,36 @@ class HealthConnectManager(private val context: Context) {
 
     suspend fun readSteps(from: Instant, to: Instant): List<StepsRecord> =
         readAll(StepsRecord::class, from, to)
+
+    /**
+     * Correct daily step totals: Health Connect's aggregate() dedupes
+     * overlapping records by app priority, so the phone pedometer's segments
+     * and Samsung Health's daily rollup don't get double-counted.
+     * Returns map of start-of-day-millis -> steps (local time zone).
+     */
+    suspend fun dailySteps(from: Instant, to: Instant): Map<Long, Long> {
+        val zone = ZoneId.systemDefault()
+        val out = HashMap<Long, Long>()
+        val response = client.aggregateGroupByPeriod(
+            AggregateGroupByPeriodRequest(
+                metrics = setOf(StepsRecord.COUNT_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(
+                    LocalDateTime.ofInstant(from, zone),
+                    LocalDateTime.ofInstant(to, zone),
+                ),
+                timeRangeSlicer = Period.ofDays(1),
+            )
+        )
+        for (bucket in response) {
+            val steps = bucket.result[StepsRecord.COUNT_TOTAL] ?: continue
+            val dayMs = bucket.startTime.atZone(zone).toInstant().toEpochMilli()
+            out[dayMs - dayMs % 86_400_000L] = steps
+        }
+        return out
+    }
+
+    suspend fun restingHrLatest(from: Instant, to: Instant): Long? =
+        readRestingHeartRate(from, to).maxByOrNull { it.time }?.beatsPerMinute
 
     private suspend fun <T : Record> readAll(
         type: kotlin.reflect.KClass<T>, from: Instant, to: Instant
