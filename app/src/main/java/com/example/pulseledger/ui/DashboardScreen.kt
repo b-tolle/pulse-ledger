@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -101,8 +102,21 @@ private fun TodayTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
     ) {
         item { Header(ui, vm) }
         item { Greeting(ui) }
+        val digest = weeklyDigest(ui.summaries)
+        if (digest != null) item {
+            Panel(Modifier.entrance(0)) {
+                Label("THIS WEEK")
+                Text(digest.headline, color = PL.Txt, fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp)
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Stat("Steps", "%,d".format(digest.steps), Modifier.weight(1f))
+                    digest.avgSleepMin?.let { Stat("Avg sleep", "%dh%02dm".format(it/60, it%60), Modifier.weight(1f)) }
+                    if (digest.exerciseMin > 0) Stat("Active", "${digest.exerciseMin}m", Modifier.weight(1f))
+                }
+            }
+        }
         item {
-            Panel {
+            Panel(Modifier.entrance(1)) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     ChargeGauge(charge.value)
                     Spacer(Modifier.height(8.dp))
@@ -181,6 +195,18 @@ private fun PressureTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
             }
         }
         item { LatestBpCard(ui) }
+        if (ui.readings.size >= 2) item {
+            Panel {
+                Label("PRESSURE BANDS · LAST 21 READINGS")
+                PressureBandChart(ui.readings)
+                Spacer(Modifier.height(6.dp))
+                Row {
+                    Text("● systolic", color = PL.Sys, fontSize = 10.sp, modifier = Modifier.padding(end = 12.dp))
+                    Text("● diastolic", color = PL.Dia, fontSize = 10.sp, modifier = Modifier.padding(end = 12.dp))
+                    Text("○ MAP", color = PL.Soft, fontSize = 10.sp)
+                }
+            }
+        }
         if (ui.readings.isNotEmpty()) {
             item {
                 Panel {
@@ -243,6 +269,21 @@ private fun HistoryTab(ui: DashboardViewModel.Ui) {
             }
         }
 
+        if (range == Range.ALL) {
+            val recs = records(ui.summaries)
+            if (recs.isNotEmpty()) item {
+                Panel(Modifier.entrance(0)) {
+                    Label("PERSONAL RECORDS")
+                    recs.forEach { r ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(r.emoji, fontSize = 18.sp, modifier = Modifier.padding(end = 10.dp))
+                            Text(r.label, color = PL.Soft, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            Text(r.value, color = PL.Txt, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+            }
+        }
         if (insights.isNotEmpty() && range == Range.ALL) items(insights) { ins ->
             Panel {
                 Row(verticalAlignment = Alignment.Top) {
@@ -341,8 +382,13 @@ private fun LatestBpCard(ui: DashboardViewModel.Ui) {
 }
 
 @Composable
-fun Panel(content: @Composable ColumnScope.() -> Unit) = Column(
-    Modifier.fillMaxWidth().background(PL.Card, RoundedCornerShape(18.dp)).padding(16.dp),
+fun Panel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) = Column(
+    modifier.fillMaxWidth()
+        .background(
+            Brush.verticalGradient(listOf(PL.CardUp.copy(alpha = 0.55f), PL.Card)),
+            RoundedCornerShape(18.dp),
+        )
+        .padding(16.dp),
     content = content,
 )
 
