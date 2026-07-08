@@ -60,23 +60,29 @@ class HealthConnectManager(private val context: Context) {
      * and Samsung Health's daily rollup don't get double-counted.
      * Returns map of start-of-day-millis -> steps (local time zone).
      */
+    /**
+     * Daily step totals, de-duplicated. Health Connect often holds BOTH
+     * granular pedometer segments AND a redundant full-day rollup
+     * (~00:00–23:59) from Samsung Health covering the same hours. Aggregate
+     * would sum them (double count), so we read raw records and, per day,
+     * keep the timestamped segments and drop the overlapping rollup. A rollup
+     * is used only for days that have no segments (older history).
+     */
     suspend fun dailySteps(from: Instant, to: Instant): Map<Long, Long> {
-        val zone = ZoneId.systemDefault()
+        val dayMs = 86_400_000L
+        val records = readAll(StepsRecord::class, from, to)
+        val hasSegments = HashSet<Long>()
+        for (r in records) {
+            val st = r.startTime.toEpochMilli(); val en = r.endTime.toEpochMilli()
+            if (en - st < 23 * 3_600_000L) hasSegments += st - st % dayMs
+        }
         val out = HashMap<Long, Long>()
-        val response = client.aggregateGroupByPeriod(
-            AggregateGroupByPeriodRequest(
-                metrics = setOf(StepsRecord.COUNT_TOTAL),
-                timeRangeFilter = TimeRangeFilter.between(
-                    LocalDateTime.ofInstant(from, zone),
-                    LocalDateTime.ofInstant(to, zone),
-                ),
-                timeRangeSlicer = Period.ofDays(1),
-            )
-        )
-        for (bucket in response) {
-            val steps = bucket.result[StepsRecord.COUNT_TOTAL] ?: continue
-            val dayMs = bucket.startTime.atZone(zone).toInstant().toEpochMilli()
-            out[dayMs - dayMs % 86_400_000L] = steps
+        for (r in records) {
+            val st = r.startTime.toEpochMilli(); val en = r.endTime.toEpochMilli()
+            val day = st - st % dayMs
+            val isRollup = en - st >= 23 * 3_600_000L
+            if (isRollup && day in hasSegments) continue
+            out[day] = (out[day] ?: 0L) + r.count
         }
         return out
     }
