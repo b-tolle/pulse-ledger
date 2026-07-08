@@ -25,10 +25,22 @@ fun DayDetailSheet(day: DailySummary, onDismiss: () -> Unit) {
     val zone = ZoneId.systemDefault()
     val date = Instant.ofEpochMilli(day.dayEpoch).atZone(zone).toLocalDate()
     val titleFmt = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy")
+    val dow = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = PL.Card) {
         Column(Modifier.fillMaxWidth().padding(20.dp).padding(bottom = 24.dp)) {
             Text(date.format(titleFmt), color = PL.Txt, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+
+            // quick narrative line
+            val note = buildString {
+                day.steps?.let { append("%,d steps".format(it)) }
+                day.exerciseMin?.let { if (isNotEmpty()) append(" · "); append("${it}m active") }
+                day.sleepMinutes?.let { if (isNotEmpty()) append(" · "); append("slept %dh%02dm".format(it/60, it%60)) }
+            }
+            if (note.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(note, color = PL.Soft, fontSize = 13.sp)
+            }
             Spacer(Modifier.height(16.dp))
 
             val rows = buildList {
@@ -50,23 +62,36 @@ fun DayDetailSheet(day: DailySummary, onDismiss: () -> Unit) {
             }
 
             Spacer(Modifier.height(20.dp))
+            Text("SEE THIS DAY ELSEWHERE", color = PL.Soft, fontSize = 11.sp,
+                fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(10.dp))
 
-            // "Where was I?" — deep link into Google Maps Timeline for this exact date
-            Button(
-                onClick = {
-                    val d = "%04d/%02d/%02d".format(date.year, date.monthValue, date.dayOfMonth)
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://timeline.google.com/maps/timeline?pb=!1m2!1m1!1s$d"))
-                    runCatching { ctx.startActivity(intent) }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = PL.CardUp),
-            ) {
-                Text("📍  Where was I this day?", color = PL.Txt, fontSize = 14.sp)
+            // Timeline: Google removed date-specific deep links (Timeline is on-device now),
+            // so we open Timeline and tell the user which date to scroll to.
+            LinkButton("🗺  Open Maps Timeline") {
+                val i = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/timeline"))
+                    .setPackage("com.google.android.apps.maps")
+                runCatching { ctx.startActivity(i) }.onFailure {
+                    runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://timeline.google.com"))) }
+                }
             }
-            Text(
-                "Opens this date in your Google Maps Timeline (your location history stays in your Google account — Pulse Ledger never sees it).",
-                color = PL.Dim, fontSize = 10.5.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 8.dp),
-            )
+            Spacer(Modifier.height(8.dp))
+            // Samsung Health opens to its history where this day's detail lives
+            LinkButton("💜  Open Samsung Health") {
+                val i = ctx.packageManager.getLaunchIntentForPackage("com.sec.android.app.shealth")
+                if (i != null) runCatching { ctx.startActivity(i) }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text("Scroll to $dow, ${date.format(DateTimeFormatter.ofPattern("MMM d"))} — Google moved Timeline to on-device only, so apps can't jump straight to a date anymore.",
+                color = PL.Dim, fontSize = 10.5.sp, lineHeight = 15.sp)
         }
+    }
+}
+
+@Composable
+private fun LinkButton(label: String, onClick: () -> Unit) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(containerColor = PL.CardUp)) {
+        Text(label, color = PL.Txt, fontSize = 14.sp)
     }
 }
