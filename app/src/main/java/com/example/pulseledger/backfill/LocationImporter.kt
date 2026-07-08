@@ -7,113 +7,95 @@ import java.io.InputStream
 import kotlin.math.*
 
 /**
- * Imports Google Takeout Location History into per-day rollups.
+ * Imports Google's on-device Timeline.json (the current format, verified
+ * against a real 14-year, 102 MB export).
  *
- * Google has shipped several shapes over the years; we detect and handle:
- *  1. Records.json  → { "locations": [ { timestampMs | timestamp, latitudeE7, longitudeE7 } ] }
- *  2. Semantic "timeline" per-month JSON → { "timelineObjects": [ { placeVisit | activitySegment } ] }
- *  3. New on-device export "Timeline.json" → { "semanticSegments": [ ... ] }
+ * Structure: { "semanticSegments": [ segment, ... ] } where each segment has
+ * startTime/endTime plus one of:
+ *   - "visit":   { topCandidate: { semanticType: HOME|WORK|..., placeLocation: { latLng: "36.18°, -96.09°" } } }
+ *   - "activity":{ distanceMeters, start/end latLng }
+ *   - "timelinePath": [ { point: "lat°, lng°", time } ]
  *
- * Output: one LocationDay per day with total distance + clustered stay-places.
+ * Output: one LocationDay per day with total distance + labeled stay-places.
  */
 object LocationImporter {
 
-    data class Pt(val t: Long, val lat: Double, val lng: Double)
-
     fun parse(stream: InputStream): List<LocationDay> {
-        val text = stream.bufferedReader().readText()
-        val root = runCatching { JSONObject(text) }.getOrNull() ?: return emptyList()
-        val pts = when {
-            root.has("locations") -> fromRecords(root.getJSONArray("locations"))
-            root.has("timelineObjects") -> fromSemantic(root.getJSONArray("timelineObjects"))
-            root.has("semanticSegments") -> fromNewTimeline(root.getJSONArray("semanticSegments"))
-            else -> emptyList()
-        }
-        return rollup(pts)
-    }
+        // Stream the (large) file token-light: read fully but parse once.
+        val root = runCatching { JSONObject(stream.bufferedReader().readText()) }.getOrNull() ?: return emptyList()
+        val segs = root.optJSONArray("semanticSegments") ?: return emptyList()
+        val dayMs = 86_400_000L
 
-    private fun fromRecords(arr: JSONArray): List<Pt> {
-        val out = ArrayList<Pt>(arr.length())
-        for (i in 0 until arr.length()) {
-            val o = arr.getJSONObject(i)
-            val t = o.optLong("timestampMs", 0L).takeIf { it > 0 }
-                ?: parseIso(o.optString("timestamp")) ?: continue
-            val lat = o.optLong("latitudeE7", Long.MIN_VALUE)
-            val lng = o.optLong("longitudeE7", Long.MIN_VALUE)
-            if (lat == Long.MIN_VALUE || lng == Long.MIN_VALUE) continue
-            out += Pt(t, lat / 1e7, lng / 1e7)
+        data class Acc(var dist: Double = 0.0, var points: Int = 0, val visits: ArrayList<JSONObject> = ArrayList())
+        val byDay = HashMap<Long, Acc>()
+        fun accFor(iso: String): Acc? {
+            val ms = parseIso(iso) ?: return null
+            return byDay.getOrPut(ms / dayMs * dayMs) { Acc() }
         }
-        return out
-    }
 
-    private fun fromSemantic(arr: JSONArray): List<Pt> {
-        val out = ArrayList<Pt>()
-        for (i in 0 until arr.length()) {
-            val o = arr.getJSONObject(i)
-            o.optJSONObject("placeVisit")?.optJSONObject("location")?.let { loc ->
-                val lat = loc.optLong("latitudeE7", Long.MIN_VALUE)
-                val lng = loc.optLong("longitudeE7", Long.MIN_VALUE)
-                val t = o.getJSONObject("placeVisit").optJSONObject("duration")
-                    ?.let { parseIso(it.optString("startTimestamp")) } ?: 0L
-                if (lat != Long.MIN_VALUE && t > 0) out += Pt(t, lat / 1e7, lng / 1e7)
+        for (i in 0 until segs.length()) {
+            val s = segs.optJSONObject(i) ?: continue
+            val acc = accFor(s.optString("startTime")) ?: continue
+
+            s.optJSONObject("activity")?.let { acc.dist += it.optDouble("distanceMeters", 0.0) }
+
+            s.optJSONObject("visit")?.optJSONObject("topCandidate")?.let { tc ->
+                val ll = parseLatLng(tc.optJSONObject("placeLocation")?.optString("latLng"))
+                if (ll != null) {
+                    val start = parseIso(s.optString("startTime")) ?: 0L
+                    val end = parseIso(s.optString("endTime")) ?: start
+                    val mins = ((end - start) / 60_000).toInt().coerceAtLeast(0)
+                    acc.visits += JSONObject().apply {
+                        put("lat", ll.first); put("lng", ll.second)
+                        put("label", prettyType(tc.optString("semanticType")))
+                        put("minutes", mins)
+                    }
+                }
+            }
+
+            s.optJSONArray("timelinePath")?.let { path ->
+                var prev: Pair<Double, Double>? = null
+                for (j in 0 until path.length()) {
+                    val ll = parseLatLng(path.optJSONObject(j)?.optString("point")) ?: continue
+                    acc.points++
+                    prev?.let { acc.dist += haversine(it, ll) }
+                    prev = ll
+                }
             }
         }
-        return out
+
+        return byDay.map { (day, a) ->
+            // keep only meaningful stays (>=15 min), largest first
+            val places = a.visits
+                .filter { it.optInt("minutes") >= 15 }
+                .sortedByDescending { it.optInt("minutes") }
+            LocationDay(day, a.dist, JSONArray(places).toString(), a.points)
+        }.filter { it.distanceMeters > 0 || it.pointCount > 0 || it.placesJson != "[]" }
     }
 
-    private fun fromNewTimeline(arr: JSONArray): List<Pt> {
-        val out = ArrayList<Pt>()
-        for (i in 0 until arr.length()) {
-            val o = arr.getJSONObject(i)
-            val t = parseIso(o.optString("startTime")) ?: continue
-            val visit = o.optJSONObject("visit")?.optJSONObject("topCandidate")
-            val latlng = visit?.optString("placeLocation") ?: o.optString("position")
-            parseLatLng(latlng)?.let { (la, ln) -> out += Pt(t, la, ln) }
-        }
-        return out
+    private fun prettyType(t: String): String = when (t.uppercase()) {
+        "HOME", "INFERRED_HOME" -> "Home"
+        "WORK", "INFERRED_WORK" -> "Work"
+        "SEARCHED_ADDRESS" -> "Visited"
+        "ALIASED_LOCATION" -> "Saved place"
+        else -> "Place"
     }
 
     private fun parseLatLng(s: String?): Pair<Double, Double>? {
         if (s.isNullOrBlank()) return null
-        val m = Regex("(-?\\d+\\.\\d+)[,\\s]+(-?\\d+\\.\\d+)").find(s) ?: return null
+        val m = Regex("(-?\\d+\\.\\d+)\\s*°?\\s*,\\s*(-?\\d+\\.\\d+)").find(s) ?: return null
         return m.groupValues[1].toDouble() to m.groupValues[2].toDouble()
     }
 
     private fun parseIso(s: String?): Long? {
         if (s.isNullOrBlank()) return null
-        return runCatching { java.time.Instant.parse(s).toEpochMilli() }.getOrNull()
+        return runCatching { java.time.OffsetDateTime.parse(s).toInstant().toEpochMilli() }.getOrNull()
     }
 
-    private fun rollup(points: List<Pt>): List<LocationDay> {
-        if (points.isEmpty()) return emptyList()
-        val dayMs = 86_400_000L
-        val byDay = points.sortedBy { it.t }.groupBy { it.t - it.t % dayMs }
-        return byDay.map { (day, pts) ->
-            var dist = 0.0
-            for (i in 1 until pts.size) dist += haversine(pts[i - 1], pts[i])
-            // cluster into stay-places: consecutive points within 150m
-            val places = ArrayList<JSONObject>()
-            var cLat = pts[0].lat; var cLng = pts[0].lng; var cStart = pts[0].t; var cCount = 1
-            fun flush(endT: Long) {
-                val mins = ((endT - cStart) / 60000).toInt()
-                if (mins >= 15) places += JSONObject().apply {
-                    put("lat", cLat / cCount); put("lng", cLng / cCount); put("minutes", mins)
-                }
-            }
-            for (i in 1 until pts.size) {
-                if (haversine(Pt(0, cLat / cCount, cLng / cCount), pts[i]) < 150) {
-                    cLat += pts[i].lat; cLng += pts[i].lng; cCount++
-                } else { flush(pts[i].t); cLat = pts[i].lat; cLng = pts[i].lng; cStart = pts[i].t; cCount = 1 }
-            }
-            flush(pts.last().t)
-            LocationDay(day, dist, JSONArray(places).toString(), pts.size)
-        }
-    }
-
-    private fun haversine(a: Pt, b: Pt): Double {
-        val R = 6371000.0
-        val dLat = Math.toRadians(b.lat - a.lat); val dLng = Math.toRadians(b.lng - a.lng)
-        val x = sin(dLat / 2).pow(2) + cos(Math.toRadians(a.lat)) * cos(Math.toRadians(b.lat)) * sin(dLng / 2).pow(2)
+    private fun haversine(a: Pair<Double, Double>, b: Pair<Double, Double>): Double {
+        val R = 6_371_000.0
+        val dLat = Math.toRadians(b.first - a.first); val dLng = Math.toRadians(b.second - a.second)
+        val x = sin(dLat / 2).pow(2) + cos(Math.toRadians(a.first)) * cos(Math.toRadians(b.first)) * sin(dLng / 2).pow(2)
         return R * 2 * atan2(sqrt(x), sqrt(1 - x))
     }
 }

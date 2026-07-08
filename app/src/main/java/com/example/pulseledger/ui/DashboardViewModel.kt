@@ -120,7 +120,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 ?: return "Couldn't open a file"
 
             // Google location history (JSON)?
-            val head = String(bytes.copyOfRange(0, minOf(bytes.size, 400)))
+            val head = String(bytes.copyOfRange(0, minOf(bytes.size, 200)))
             if (head.contains("\"locations\"") || head.contains("timelineObjects") || head.contains("semanticSegments")) {
                 val days = LocationImporter.parse(ByteArrayInputStream(bytes))
                 if (days.isNotEmpty()) {
