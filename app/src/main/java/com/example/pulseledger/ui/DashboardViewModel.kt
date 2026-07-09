@@ -125,12 +125,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             val bytes = getApplication<Application>().contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: return "Couldn't open a file"
 
-            // Google location history (JSON)?
+            // Google location history (JSON)? Detect from the first bytes, then
+            // STREAM from a fresh input stream (never hold the whole file).
             val head = String(bytes.copyOfRange(0, minOf(bytes.size, 200)))
-            if (head.contains("\"locations\"") || head.contains("timelineObjects") || head.contains("semanticSegments")) {
-                val days = LocationImporter.parse(ByteArrayInputStream(bytes))
+            if (head.contains("semanticSegments") || head.contains("timelineObjects") || head.contains("\"locations\"")) {
+                val cr = getApplication<Application>().contentResolver
+                val days = cr.openInputStream(uri)?.use { LocationImporter.parse(it) } ?: emptyList()
                 if (days.isNotEmpty()) {
-                    Db.get(getApplication()).dao().upsertLocationDays(days)
+                    days.chunked(500).forEach { Db.get(getApplication()).dao().upsertLocationDays(it) }
                     val totalKm = days.sumOf { it.distanceMeters } / 1000.0
                     return "✓ ${days.size} days of location · ${"%,.0f".format(totalKm * 0.621371)} mi mapped"
                 }
