@@ -346,7 +346,7 @@ private fun Header(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                 Text("on-device · Health Connect", color = PL.Dim, fontSize = 11.sp)
             }
             TextButton(onClick = {
-                picker.launch(arrayOf("text/*", "text/csv", "application/octet-stream", "text/comma-separated-values"))
+                picker.launch(arrayOf("*/*"))
             }) { Text("Import", color = PL.Dim, fontSize = 12.sp) }
             TextButton(onClick = vm::load, enabled = !ui.loading) {
                 Text(if (ui.loading) "Syncing…" else "Refresh", color = PL.Dia, fontSize = 12.sp)
