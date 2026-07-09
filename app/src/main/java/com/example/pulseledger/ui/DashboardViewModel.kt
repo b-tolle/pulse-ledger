@@ -10,6 +10,8 @@ import com.example.pulseledger.data.db.BpReading
 import com.example.pulseledger.data.db.DailySummary
 import com.example.pulseledger.data.db.LocationDay
 import com.example.pulseledger.life.CalendarReader
+import com.example.pulseledger.life.Places
+import com.example.pulseledger.life.CurrentLocation
 import com.example.pulseledger.data.db.Db
 import com.example.pulseledger.backfill.SamsungImporter
 import com.example.pulseledger.backfill.LocationImporter
@@ -36,6 +38,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val calendar: CalendarReader.DayLoad? = null,
         val locationDays: Map<Long, LocationDay> = emptyMap(),
         val locationDayCount: Int = 0,
+        val currentPlace: String? = null,
+        val anchors: List<Places.Anchor> = emptyList(),
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -79,7 +83,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val histDays = dao.stepDaysCount()
                 val histSince = dao.earliestStepDay()
                 val allSummaries = dao.allSummaries()
-                val locDays = dao.allLocationDays().associateBy { it.dayEpoch }
+                val locDaysList = dao.allLocationDays()
+                val locDays = locDaysList.associateBy { it.dayEpoch }
+                val anchors = Places.learnAnchors(locDaysList)
+                val here = runCatching { CurrentLocation.get(getApplication()) }.getOrNull()
+                val place = here?.let { (la, ln) ->
+                    Places.classify(la, ln, anchors)?.label ?: "Out and about"
+                }
                 val cal = runCatching { CalendarReader.today(getApplication()) }.getOrNull()
 
                 _ui.value = _ui.value.copy(
@@ -94,6 +104,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     calendar = cal,
                     locationDays = locDays,
                     locationDayCount = locDays.size,
+                    currentPlace = place,
+                    anchors = anchors,
                 )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(loading = false, error = t.message ?: "read failed")

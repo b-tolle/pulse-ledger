@@ -1,6 +1,10 @@
 package com.example.pulseledger.ui
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color as AColor
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.*
@@ -16,16 +20,32 @@ import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Polyline
 
 private fun initOsm(ctx: Context) {
     Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osm", Context.MODE_PRIVATE))
     Configuration.getInstance().userAgentValue = "PulseLedger"
 }
 
-/** Places from one or more LocationDays, drawn as dots on a real street map. */
+private fun dot(color: Int): BitmapDrawable {
+    val size = 36
+    val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val c = Canvas(bmp)
+    val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    p.color = AColor.WHITE; c.drawCircle(size / 2f, size / 2f, size / 2f, p)
+    p.color = color; c.drawCircle(size / 2f, size / 2f, size / 2f - 4f, p)
+    return BitmapDrawable(null, bmp)
+}
+
+private fun colorFor(label: String): Int = when (label) {
+    "Home" -> AColor.parseColor("#3EE58A")
+    "Work" -> AColor.parseColor("#5B9BFF")
+    "Visited" -> AColor.parseColor("#F5A623")
+    "Saved place" -> AColor.parseColor("#F0C36D")
+    else -> AColor.parseColor("#9D8CFF")
+}
+
 @Composable
-fun PlacesMap(days: List<LocationDay>, heightDp: Int = 260) {
+fun PlacesMap(days: List<LocationDay>, heightDp: Int = 220) {
     val ctx = LocalContext.current
     LaunchedEffect(Unit) { initOsm(ctx) }
 
@@ -58,7 +78,8 @@ fun PlacesMap(days: List<LocationDay>, heightDp: Int = 260) {
                 Marker(map).apply {
                     position = GeoPoint(lat, lng)
                     title = label
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    icon = dot(colorFor(label))
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     map.overlays.add(this)
                 }
                 minLat = minOf(minLat, lat); maxLat = maxOf(maxLat, lat)
@@ -66,10 +87,12 @@ fun PlacesMap(days: List<LocationDay>, heightDp: Int = 260) {
             }
             map.post {
                 runCatching {
-                    map.zoomToBoundingBox(
-                        BoundingBox(maxLat + 0.01, maxLng + 0.01, minLat - 0.01, minLng - 0.01),
-                        false, 60,
-                    )
+                    if (points.size == 1) {
+                        map.controller.setZoom(15.0)
+                        map.controller.setCenter(GeoPoint(points[0].first, points[0].second))
+                    } else {
+                        map.zoomToBoundingBox(BoundingBox(maxLat + 0.02, maxLng + 0.02, minLat - 0.02, minLng - 0.02), false, 50)
+                    }
                 }
             }
             map.invalidate()

@@ -3,6 +3,8 @@ package com.example.pulseledger.ui
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -30,7 +32,7 @@ fun DayDetailSheet(day: DailySummary, location: LocationDay? = null, onDismiss: 
     val dow = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = PL.Card) {
-        Column(Modifier.fillMaxWidth().padding(20.dp).padding(bottom = 24.dp)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom = 24.dp)) {
             Text(date.format(titleFmt), color = PL.Txt, fontSize = 18.sp, fontWeight = FontWeight.Bold)
 
             // quick narrative line

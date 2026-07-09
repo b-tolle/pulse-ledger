@@ -94,6 +94,11 @@ private fun TodayTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
         if (it) vm.load()
     }
     val hasCal = ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+    val locPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (it) vm.load()
+    }
+    val hasLoc = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    LaunchedEffect(Unit) { if (!hasLoc) locPerm.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
 
     val charge = remember(ui.summaries, ui.stepsToday, ui.calendar) {
         computeCharge(ui.summaries, ui.stepsToday, ui.calendar?.eventCount, ui.calendar?.busyMinutes)
@@ -170,10 +175,21 @@ private fun Greeting(ui: DashboardViewModel.Ui) {
             append(date)
             if (cal != null && cal.eventCount > 0) {
                 append("  ·  ${cal.eventCount} event${if (cal.eventCount>1) "s" else ""}")
-                if (cal.backToBack > 0) append(", ${cal.backToBack} back-to-back")
             }
         }
         Text(sub, color = PL.Soft, fontSize = 13.sp)
+        ui.currentPlace?.let { place ->
+            Spacer(Modifier.height(6.dp))
+            val (emoji, color) = when (place) {
+                "Home" -> "⌂" to PL.Charge
+                "Work" -> "▤" to PL.Dia
+                else -> "⚑" to PL.Gold
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(emoji, fontSize = 14.sp, color = color, modifier = Modifier.padding(end = 6.dp))
+                Text("Currently: $place", color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
 }
 
