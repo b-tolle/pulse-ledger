@@ -24,6 +24,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import com.example.pulseledger.data.db.BpReading
 import com.example.pulseledger.data.db.DailySummary
 import com.example.pulseledger.domain.Calculations
@@ -336,10 +338,35 @@ private fun HistoryTab(ui: DashboardViewModel.Ui) {
 /* ──────────────────────── Pieces ───────────────────────── */
 @Composable
 private fun Header(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
+    val ctx = LocalContext.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) vm.importCsvs(uris)
     }
+    var update by remember { mutableStateOf<Updater.Available?>(null) }
+    var updating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        update = Updater.check(currentVersionCode(ctx))
+    }
     Column {
+        update?.let { av ->
+            Panel(Modifier.padding(bottom = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Update available", color = PL.Charge, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Version ${av.versionName}", color = PL.Soft, fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = {
+                            updating = true
+                            scope.launch { runCatching { Updater.downloadAndInstall(ctx, av.apkUrl) } }
+                        },
+                        enabled = !updating,
+                        colors = ButtonDefaults.buttonColors(containerColor = PL.Charge),
+                    ) { Text(if (updating) "Downloading…" else "Update", color = PL.Bg) }
+                }
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Pulse Ledger", color = PL.Txt, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
@@ -486,6 +513,11 @@ private fun AddReadingDialog(onDismiss: () -> Unit, onSave: (Int, Int, Int?) -> 
 private fun Center(msg: String) = Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
     Text(msg, color = PL.Soft)
 }
+
+private fun currentVersionCode(ctx: android.content.Context): Int = runCatching {
+    val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+    if (android.os.Build.VERSION.SDK_INT >= 28) pi.longVersionCode.toInt() else @Suppress("DEPRECATION") pi.versionCode
+}.getOrDefault(0)
 
 private fun fmtTime(epoch: Long): String =
     DateTimeFormatter.ofPattern("MMM d · h:mm a").withZone(ZoneId.systemDefault())

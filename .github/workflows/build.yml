@@ -12,14 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
       - uses: android-actions/setup-android@v3
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
@@ -36,15 +33,35 @@ jobs:
         if: failure()
         run: |
           tail -n 400 build.log > error-tail.txt
-          git config user.name "ci"
-          git config user.email "ci@local"
+          git config user.name "ci"; git config user.email "ci@local"
           git checkout -B ci-logs
           git add -f error-tail.txt
           git commit -m "build error log"
           git push -f origin ci-logs
 
-      - name: Upload APK
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk pulse-ledger.apk
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v0.1.${{ github.run_number }}"
+          name: "Pulse Ledger 0.1.${{ github.run_number }}"
+          files: pulse-ledger.apk
+          make_latest: true
+
+      - name: Write version manifest
+        run: |
+          echo "{\"versionCode\": ${{ github.run_number }}, \"versionName\": \"0.1.${{ github.run_number }}\", \"apk\": \"https://github.com/b-tolle/pulse-ledger/releases/latest/download/pulse-ledger.apk\"}" > latest.json
+          git config user.name "ci"; git config user.email "ci@local"
+          git fetch origin main
+          git checkout main
+          git add latest.json
+          git commit -m "version manifest v0.1.${{ github.run_number }}" || true
+          git push origin main || true
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: pulse-ledger-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: pulse-ledger.apk
