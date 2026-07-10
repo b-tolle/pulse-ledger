@@ -5,18 +5,19 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
+import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Self-update via the GitHub Releases API (always reflects the newest build,
- * no committed manifest to race). Release tags are "v0.1.<runNumber>", and the
- * runNumber is our versionCode, so we compare tag number to installed code.
+ * Self-update WITHOUT the GitHub API (anonymous API is rate-limited to 60/hr,
+ * which silently breaks update checks). Instead we resolve the "latest release"
+ * redirect: hitting /releases/latest returns a 302 to /releases/tag/vX.Y.Z, and
+ * the tag's last number is our versionCode. The APK is a fixed download path.
  */
 object Updater {
-    private const val RELEASES =
-        "https://api.github.com/repos/b-tolle/pulse-ledger/releases?per_page=1"
+    private const val LATEST_REDIRECT =
+        "https://github.com/b-tolle/pulse-ledger/releases/latest"
     private const val APK_URL =
         "https://github.com/b-tolle/pulse-ledger/releases/latest/download/pulse-ledger.apk"
 
@@ -24,14 +25,14 @@ object Updater {
 
     suspend fun check(currentCode: Int): Available? = withContext(Dispatchers.IO) {
         runCatching {
-            val conn = (URL(RELEASES).openConnection() as java.net.HttpURLConnection).apply {
-                setRequestProperty("Accept", "application/vnd.github+json")
+            val conn = (URL(LATEST_REDIRECT).openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = false     // we want to READ the redirect target
                 connectTimeout = 8000; readTimeout = 8000
+                requestMethod = "HEAD"
             }
-            // /releases returns newest-first; take [0] (— /releases/latest can return empty)
-            val arr = org.json.JSONArray(conn.inputStream.bufferedReader().readText())
-            if (arr.length() == 0) return@runCatching null
-            val tag = arr.getJSONObject(0).getString("tag_name")   // e.g. "v0.1.41"
+            val loc = conn.getHeaderField("Location") ?: return@runCatching null
+            // loc = ".../releases/tag/v0.1.42"
+            val tag = loc.substringAfterLast("/tag/").ifBlank { return@runCatching null }
             val latestCode = tag.substringAfterLast('.').toIntOrNull() ?: return@runCatching null
             if (latestCode > currentCode) Available(tag.removePrefix("v"), APK_URL) else null
         }.getOrNull()
@@ -39,7 +40,9 @@ object Updater {
 
     suspend fun downloadAndInstall(ctx: Context, apkUrl: String) = withContext(Dispatchers.IO) {
         val file = File(ctx.cacheDir, "update.apk")
-        URL(apkUrl).openStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+        (URL(apkUrl).openConnection() as HttpURLConnection).apply {
+            instanceFollowRedirects = true; connectTimeout = 15000; readTimeout = 60000
+        }.inputStream.use { input -> file.outputStream().use { input.copyTo(it) } }
         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
