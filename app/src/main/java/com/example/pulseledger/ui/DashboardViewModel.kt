@@ -113,6 +113,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun weekly(pick: (com.example.pulseledger.data.db.DailySummary) -> Double?): List<Double?> {
+        val now = System.currentTimeMillis(); val dayMs = 86_400_000L
+        val today = now - now % dayMs
+        val byDay = _ui.value.summaries.associateBy { it.dayEpoch }
+        return (6 downTo 0).map { back -> byDay[today - back * dayMs]?.let(pick) }
+    }
+
     fun addManual(sys: Int, dia: Int, pulse: Int?) {
         viewModelScope.launch {
             Db.get(getApplication()).dao().upsertReadings(listOf(
