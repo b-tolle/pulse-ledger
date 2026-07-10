@@ -15,8 +15,8 @@ import java.net.URL
  * runNumber is our versionCode, so we compare tag number to installed code.
  */
 object Updater {
-    private const val LATEST_RELEASE =
-        "https://api.github.com/repos/b-tolle/pulse-ledger/releases/latest"
+    private const val RELEASES =
+        "https://api.github.com/repos/b-tolle/pulse-ledger/releases?per_page=1"
     private const val APK_URL =
         "https://github.com/b-tolle/pulse-ledger/releases/latest/download/pulse-ledger.apk"
 
@@ -24,12 +24,14 @@ object Updater {
 
     suspend fun check(currentCode: Int): Available? = withContext(Dispatchers.IO) {
         runCatching {
-            val conn = (URL(LATEST_RELEASE).openConnection() as java.net.HttpURLConnection).apply {
+            val conn = (URL(RELEASES).openConnection() as java.net.HttpURLConnection).apply {
                 setRequestProperty("Accept", "application/vnd.github+json")
                 connectTimeout = 8000; readTimeout = 8000
             }
-            val json = JSONObject(conn.inputStream.bufferedReader().readText())
-            val tag = json.getString("tag_name")               // e.g. "v0.1.38"
+            // /releases returns newest-first; take [0] (— /releases/latest can return empty)
+            val arr = org.json.JSONArray(conn.inputStream.bufferedReader().readText())
+            if (arr.length() == 0) return@runCatching null
+            val tag = arr.getJSONObject(0).getString("tag_name")   // e.g. "v0.1.41"
             val latestCode = tag.substringAfterLast('.').toIntOrNull() ?: return@runCatching null
             if (latestCode > currentCode) Available(tag.removePrefix("v"), APK_URL) else null
         }.getOrNull()
