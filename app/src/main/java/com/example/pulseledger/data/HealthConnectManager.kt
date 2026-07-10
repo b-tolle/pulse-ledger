@@ -69,20 +69,26 @@ class HealthConnectManager(private val context: Context) {
      * is used only for days that have no segments (older history).
      */
     suspend fun dailySteps(from: Instant, to: Instant): Map<Long, Long> {
-        val dayMs = 86_400_000L
-        val records = readAll(StepsRecord::class, from, to)
-        val hasSegments = HashSet<Long>()
-        for (r in records) {
-            val st = r.startTime.toEpochMilli(); val en = r.endTime.toEpochMilli()
-            if (en - st < 23 * 3_600_000L) hasSegments += st - st % dayMs
-        }
+        // Use Health Connect's own aggregation. It merges ALL step sources
+        // (phone, Samsung Health, Fitbit/Google Health) using the user's
+        // Data-sources-and-priority order and de-duplicates overlaps — the
+        // correct way to avoid the multi-source double-counting we saw.
+        val zone = ZoneId.systemDefault()
         val out = HashMap<Long, Long>()
-        for (r in records) {
-            val st = r.startTime.toEpochMilli(); val en = r.endTime.toEpochMilli()
-            val day = st - st % dayMs
-            val isRollup = en - st >= 23 * 3_600_000L
-            if (isRollup && day in hasSegments) continue
-            out[day] = (out[day] ?: 0L) + r.count
+        val response = client.aggregateGroupByPeriod(
+            AggregateGroupByPeriodRequest(
+                metrics = setOf(StepsRecord.COUNT_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(
+                    LocalDateTime.ofInstant(from, zone),
+                    LocalDateTime.ofInstant(to, zone),
+                ),
+                timeRangeSlicer = Period.ofDays(1),
+            )
+        )
+        for (bucket in response) {
+            val steps = bucket.result[StepsRecord.COUNT_TOTAL] ?: continue
+            val dayMs = bucket.startTime.atZone(zone).toInstant().toEpochMilli()
+            out[dayMs - dayMs % 86_400_000L] = steps
         }
         return out
     }
