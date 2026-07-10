@@ -10,21 +10,28 @@ import java.io.File
 import java.net.URL
 
 /**
- * Self-update: reads latest.json from the repo, compares versionCode, and if
- * newer, downloads the APK and fires the system installer. One tap, no GitHub.
+ * Self-update via the GitHub Releases API (always reflects the newest build,
+ * no committed manifest to race). Release tags are "v0.1.<runNumber>", and the
+ * runNumber is our versionCode, so we compare tag number to installed code.
  */
 object Updater {
-    private const val MANIFEST =
-        "https://raw.githubusercontent.com/b-tolle/pulse-ledger/main/latest.json"
+    private const val LATEST_RELEASE =
+        "https://api.github.com/repos/b-tolle/pulse-ledger/releases/latest"
+    private const val APK_URL =
+        "https://github.com/b-tolle/pulse-ledger/releases/latest/download/pulse-ledger.apk"
 
     data class Available(val versionName: String, val apkUrl: String)
 
     suspend fun check(currentCode: Int): Available? = withContext(Dispatchers.IO) {
         runCatching {
-            val json = JSONObject(URL(MANIFEST).readText())
-            if (json.getInt("versionCode") > currentCode)
-                Available(json.getString("versionName"), json.getString("apk"))
-            else null
+            val conn = (URL(LATEST_RELEASE).openConnection() as java.net.HttpURLConnection).apply {
+                setRequestProperty("Accept", "application/vnd.github+json")
+                connectTimeout = 8000; readTimeout = 8000
+            }
+            val json = JSONObject(conn.inputStream.bufferedReader().readText())
+            val tag = json.getString("tag_name")               // e.g. "v0.1.38"
+            val latestCode = tag.substringAfterLast('.').toIntOrNull() ?: return@runCatching null
+            if (latestCode > currentCode) Available(tag.removePrefix("v"), APK_URL) else null
         }.getOrNull()
     }
 
