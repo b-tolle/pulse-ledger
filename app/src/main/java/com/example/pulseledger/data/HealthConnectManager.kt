@@ -147,6 +147,15 @@ class HealthConnectManager(private val context: Context) {
     }
 
 
+    /** Deletes every BP record THIS app wrote to Health Connect (any era —
+     *  including the year-12-AD ones). Other apps' records are untouched. */
+    suspend fun deleteMyBloodPressure() {
+        client.deleteRecords(
+            BloodPressureRecord::class,
+            TimeRangeFilter.before(Instant.now().plusSeconds(172_800)),
+        )
+    }
+
     /** Writes BP readings into Health Connect so every app (Google Health, etc.) can see them. */
     suspend fun writeBloodPressure(readings: List<Triple<Long, Int, Int>>): Int {
         if (readings.isEmpty()) return 0

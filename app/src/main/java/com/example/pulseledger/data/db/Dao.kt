@@ -6,6 +6,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface HealthDao {
     @Upsert suspend fun upsertReadings(readings: List<BpReading>)
+
+    @Query("DELETE FROM bp_readings WHERE source = 'csv_import'")
+    suspend fun deleteCsvReadings()
     @Upsert suspend fun upsertSummaries(summaries: List<DailySummary>)
 
     @Query("SELECT * FROM bp_readings ORDER BY epochMillis DESC LIMIT :limit")

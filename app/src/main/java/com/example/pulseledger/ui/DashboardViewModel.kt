@@ -219,6 +219,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             val res = CsvImporter.parse(ByteArrayInputStream(bytes))
             if (res.readings.isEmpty()) "No BP readings found in one file"
             else {
+                // Self-healing re-import: wipe our prior CSV rows locally AND every
+                // BP record we previously wrote to Health Connect, then insert fresh.
+                runCatching { Db.get(getApplication()).dao().deleteCsvReadings() }
+                runCatching { HealthConnectManager(getApplication()).deleteMyBloodPressure() }
                 Db.get(getApplication()).dao().upsertReadings(res.readings)
                 val wrote = runCatching {
                     HealthConnectManager(getApplication())
