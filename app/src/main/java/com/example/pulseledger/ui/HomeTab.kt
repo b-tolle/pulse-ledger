@@ -4,7 +4,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -88,6 +92,28 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int)
                     ui.readings.firstOrNull()?.let { "${it.systolic}/${it.diastolic}" }, "",
                     ui.readings.firstOrNull()?.let { bpSeverityColor(it.systolic, it.diastolic) } ?: PL.Dia,
                     sub = "latest reading", modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onNavigate(1) })
+            }
+        }
+        ui.sleepNight?.let { night ->
+            item {
+                Card(Modifier.clickable { onNavigate(3) }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(10.dp).clip(RoundedCornerShape(5.dp)).background(PL.Sleep))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Sleep", color = PL.Soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f))
+                        val mins = ((night.end - night.start) / 60_000).toInt()
+                        Text("%dh %02dm".format(mins / 60, mins % 60), color = PL.Txt, fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+                    if (night.stages.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        Hypnogram(night, heightDp = 110)
+                    }
+                    Text("tap for detail", color = PL.Dim, fontSize = 10.5.sp,
+                        modifier = Modifier.padding(top = 6.dp))
+                }
             }
         }
     }

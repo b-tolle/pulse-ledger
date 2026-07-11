@@ -98,8 +98,10 @@ class HealthConnectManager(private val context: Context) {
         val response = client.aggregateGroupByPeriod(
             AggregateGroupByPeriodRequest(
                 metrics = setOf(StepsRecord.COUNT_TOTAL),
+                // Buckets slice from the FILTER START — snap it to local midnight
+                // or "today" gets keyed to yesterday's partial bucket.
                 timeRangeFilter = TimeRangeFilter.between(
-                    LocalDateTime.ofInstant(from, zone),
+                    LocalDateTime.ofInstant(from, zone).toLocalDate().atStartOfDay(),
                     LocalDateTime.ofInstant(to, zone),
                 ),
                 timeRangeSlicer = Period.ofDays(1),

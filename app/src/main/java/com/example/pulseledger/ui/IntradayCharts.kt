@@ -99,14 +99,38 @@ fun Hypnogram(night: HealthConnectManager.SleepNight, heightDp: Int = 150) {
         labels.forEachIndexed { i, lab ->
             drawContext.canvas.nativeCanvas.drawText(lab, 8f, padT + rowH * i + rowH / 2 + 8f, axisPaint())
         }
+        // Connectors first (under the blocks): thin gradient lines linking
+        // consecutive stages, fading from the previous color to the next.
+        var prevSpan: HealthConnectManager.StageSpan? = null
+        night.stages.forEach { sp ->
+            val r = row(sp.type) ?: return@forEach
+            prevSpan?.let { pv ->
+                val pr = row(pv.type)
+                if (pr != null && pr != r) {
+                    val cxLine = x(sp.start)
+                    val yA = padT + rowH * pr + rowH / 2f
+                    val yB = padT + rowH * r + rowH / 2f
+                    drawLine(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = if (yA < yB) listOf(rowColor[pr].copy(alpha = 0.55f), rowColor[r].copy(alpha = 0.55f))
+                                     else listOf(rowColor[r].copy(alpha = 0.55f), rowColor[pr].copy(alpha = 0.55f)),
+                            startY = minOf(yA, yB), endY = maxOf(yA, yB),
+                        ),
+                        start = Offset(cxLine, yA), end = Offset(cxLine, yB),
+                        strokeWidth = 3.5f,
+                    )
+                }
+            }
+            prevSpan = sp
+        }
         night.stages.forEach { sp ->
             val r = row(sp.type) ?: return@forEach
             val x0 = x(sp.start); val x1 = x(sp.end)
             drawRoundRect(
                 color = rowColor[r],
-                topLeft = Offset(x0, padT + rowH * r + rowH * 0.22f),
-                size = Size((x1 - x0).coerceAtLeast(6f), rowH * 0.56f),
-                cornerRadius = CornerRadius(8f, 8f),
+                topLeft = Offset(x0, padT + rowH * r + rowH * 0.20f),
+                size = Size((x1 - x0).coerceAtLeast(8f), rowH * 0.60f),
+                cornerRadius = CornerRadius(12f, 12f),
             )
         }
         // start/end labels
