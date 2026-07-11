@@ -48,6 +48,25 @@ class HealthConnectManager(private val context: Context) {
     suspend fun readHrv(from: Instant, to: Instant): List<HeartRateVariabilityRmssdRecord> =
         readAll(HeartRateVariabilityRmssdRecord::class, from, to)
 
+    /** Most recent instantaneous HR sample: value, time, and source app. */
+    suspend fun latestHeartRate(from: Instant, to: Instant): Triple<Long, Instant, String>? {
+        val recs = readAll(HeartRateRecord::class, from, to)
+        var best: Triple<Long, Instant, String>? = null
+        for (r in recs) for (s in r.samples) {
+            if (best == null || s.time.isAfter(best!!.second))
+                best = Triple(s.beatsPerMinute, s.time, r.metadata.dataOrigin.packageName)
+        }
+        return best
+    }
+
+    /** Count of HR samples in range + set of source packages (diagnostic). */
+    suspend fun heartRateSources(from: Instant, to: Instant): Pair<Int, Set<String>> {
+        val recs = readAll(HeartRateRecord::class, from, to)
+        val srcs = recs.map { it.metadata.dataOrigin.packageName }.toSet()
+        val count = recs.sumOf { it.samples.size }
+        return count to srcs
+    }
+
     suspend fun readSleep(from: Instant, to: Instant): List<SleepSessionRecord> =
         readAll(SleepSessionRecord::class, from, to)
 

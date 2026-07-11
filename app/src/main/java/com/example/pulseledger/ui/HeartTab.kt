@@ -21,8 +21,28 @@ fun HeartTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
     ) {
         item { AppHeader(ui, vm) }
         item {
-            StatHeader("RESTING", ui.restingHr?.toString(), "bpm", PL.Sys,
-                listOf("Avg" to "", "Max" to "", "Min" to ""))
+            StatHeader("HEART RATE", (ui.latestHr ?: ui.restingHr)?.toString(), "bpm", PL.Sys,
+                listOf("Resting" to (ui.restingHr?.toString() ?: ""),
+                       "Samples" to (if (ui.hrSampleCount > 0) "${ui.hrSampleCount}" else "")))
+        }
+        item {
+            Card {
+                SectionLabel("HEART RATE SOURCES IN HEALTH CONNECT")
+                Spacer(Modifier.height(8.dp))
+                if (ui.hrSampleCount == 0) {
+                    Text("No heart-rate samples found in the last 30 days. Your Fitbit Air needs to be worn and synced (via the Fitbit or Google Health app) before HR appears here. It's normal for this to be empty while the Air is still calibrating.",
+                        color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
+                } else {
+                    Text("${ui.hrSampleCount} samples from: " +
+                        ui.hrSources.joinToString(", ") { it.substringAfterLast('.') },
+                        color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
+                    ui.latestHrSource?.let {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Most recent: ${ui.latestHr} bpm via ${it.substringAfterLast('.')}",
+                            color = PL.Charge, fontSize = 12.sp)
+                    }
+                }
+            }
         }
         item {
             Card {

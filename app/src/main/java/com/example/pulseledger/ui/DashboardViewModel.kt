@@ -40,6 +40,11 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val locationDayCount: Int = 0,
         val currentPlace: String? = null,
         val anchors: List<Places.Anchor> = emptyList(),
+        val latestHr: Long? = null,
+        val latestHrTime: Long? = null,
+        val latestHrSource: String? = null,
+        val hrSampleCount: Int = 0,
+        val hrSources: Set<String> = emptySet(),
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -78,6 +83,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
                 val rhr = hc.readRestingHeartRate(from, now)
                     .maxByOrNull { it.time }?.beatsPerMinute
+                val latestHr = runCatching { hc.latestHeartRate(from, now) }.getOrNull()
+                val hrDiag = runCatching { hc.heartRateSources(from, now) }.getOrNull()
 
                 val dao = Db.get(getApplication()).dao()
                 val histDays = dao.stepDaysCount()
@@ -106,6 +113,11 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     locationDayCount = locDays.size,
                     currentPlace = place,
                     anchors = anchors,
+                    latestHr = latestHr?.first,
+                    latestHrTime = latestHr?.second?.toEpochMilli(),
+                    latestHrSource = latestHr?.third,
+                    hrSampleCount = hrDiag?.first ?: 0,
+                    hrSources = hrDiag?.second ?: emptySet(),
                 )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(loading = false, error = t.message ?: "read failed")
