@@ -24,6 +24,11 @@ import java.time.Instant
 
 class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
+    data class WorkoutUi(
+        val title: String, val start: Long, val end: Long,
+        val avgHr: Int?, val maxHr: Int?, val spark: List<Double>,
+    )
+
     data class Ui(
         val loading: Boolean = false,
         val readings: List<BpReading> = emptyList(),   // newest first
@@ -51,6 +56,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val stepWeekLive: List<Double?> = emptyList(),
         val weekLabels: List<String> = emptyList(),
         val sleepNight: HealthConnectManager.SleepNight? = null,
+        val workouts: List<WorkoutUi> = emptyList(),
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -109,6 +115,20 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                         .atStartOfDay(zoneId2()).toInstant().toEpochMilli()]
                 }
                 val night = runCatching { hc.lastSleepSession(now) }.getOrNull()
+                val workouts = runCatching {
+                    hc.recentWorkouts(now.minus(Duration.ofDays(14)), now).take(5).map { wk ->
+                        val hr = hc.hrSamples(
+                            java.time.Instant.ofEpochMilli(wk.start),
+                            java.time.Instant.ofEpochMilli(wk.end),
+                        ).map { it.first }
+                        WorkoutUi(
+                            title = wk.title, start = wk.start, end = wk.end,
+                            avgHr = hr.takeIf { it.isNotEmpty() }?.average()?.toInt(),
+                            maxHr = hr.maxOrNull()?.toInt(),
+                            spark = hr.map { it.toDouble() },
+                        )
+                    }
+                }.getOrDefault(emptyList())
 
                 val dao = Db.get(getApplication()).dao()
                 val histDays = dao.stepDaysCount()
@@ -148,6 +168,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     stepWeekLive = stepWeekLive,
                     weekLabels = weekLabels,
                     sleepNight = night,
+                    workouts = workouts,
                 )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(loading = false, error = t.message ?: "read failed")

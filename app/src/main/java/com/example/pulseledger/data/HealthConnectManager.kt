@@ -30,6 +30,7 @@ class HealthConnectManager(private val context: Context) {
         HealthPermission.getReadPermission(RestingHeartRateRecord::class),
         HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
+        HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getReadPermission(OxygenSaturationRecord::class),
     )
@@ -144,6 +145,20 @@ class HealthConnectManager(private val context: Context) {
             }
             .mapValues { (_, v) -> v.map { it.heartRateVariabilityMillis }.average() }
     }
+
+    data class Workout(val title: String, val start: Long, val end: Long)
+
+    /** Recent exercise sessions (Fitbit auto-detected or manual). */
+    suspend fun recentWorkouts(from: Instant, to: Instant): List<Workout> =
+        readAll(ExerciseSessionRecord::class, from, to)
+            .sortedByDescending { it.endTime }
+            .map {
+                Workout(
+                    title = it.title?.takeIf { t -> t.isNotBlank() } ?: "Workout",
+                    start = it.startTime.toEpochMilli(),
+                    end = it.endTime.toEpochMilli(),
+                )
+            }
 
     data class StageSpan(val type: Int, val start: Long, val end: Long)
     data class SleepNight(val start: Long, val end: Long, val stages: List<StageSpan>)
