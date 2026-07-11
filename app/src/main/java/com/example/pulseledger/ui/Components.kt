@@ -1,6 +1,7 @@
 package com.example.pulseledger.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -73,9 +74,10 @@ fun MetricCard(
     accent: Color,
     sub: String? = null,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     chart: (@Composable () -> Unit)? = null,
 ) {
-    Card(modifier) {
+    Card(if (onClick != null) modifier.clickable { onClick() } else modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(10.dp).clip(RoundedCornerShape(5.dp)).background(accent))
             Spacer(Modifier.width(8.dp))

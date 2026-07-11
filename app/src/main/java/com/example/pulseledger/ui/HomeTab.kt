@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 
 @Composable
-fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
+fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int) -> Unit = {}) {
     val ctx = LocalContext.current
     val locPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { if (it) vm.load() }
     val hasLoc = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -62,11 +62,11 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricCard("Heart Rate", ui.restingHr?.toString(), "bpm", PL.Sys,
-                    sub = "resting today", modifier = Modifier.weight(1f)) {
+                    sub = "resting today", modifier = Modifier.weight(1f), onClick = { onNavigate(1) }) {
                     EmptyChartSlot(40, "Live HR needs Fitbit Air")
                 }
                 MetricCard("Steps", ui.stepsToday?.let { "%,d".format(it) }, "", PL.Charge,
-                    sub = ui.steps7dAvg?.let { "avg %,d".format(it) } ?: "", modifier = Modifier.weight(1f)) {
+                    sub = ui.steps7dAvg?.let { "avg %,d".format(it) } ?: "", modifier = Modifier.weight(1f), onClick = { onNavigate(3) }) {
                     WeekBars(stepWeek, PL.Charge)
                 }
             }
@@ -76,10 +76,10 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                 val loc = ui.currentPlace
                 MetricCard("Location", loc, "", when (loc) {
                     "Home" -> PL.Charge; "Work" -> PL.Dia; else -> PL.Gold
-                }, sub = if (loc == null) "grant location" else "right now", modifier = Modifier.weight(1f))
+                }, sub = if (loc == null) "grant location" else "right now", modifier = Modifier.weight(1f), onClick = { onNavigate(4) })
                 MetricCard("Blood Pressure",
                     ui.readings.firstOrNull()?.let { "${it.systolic}/${it.diastolic}" }, "",
-                    PL.Dia, sub = "latest reading", modifier = Modifier.weight(1f))
+                    PL.Dia, sub = "latest reading", modifier = Modifier.weight(1f), onClick = { onNavigate(4) })
             }
         }
     }

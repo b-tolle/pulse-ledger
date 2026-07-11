@@ -64,7 +64,7 @@ fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequest
                     Spacer(Modifier.height(16.dp)); Button(onClick = onRequestPermissions) { Text("Grant access") }
                 }
                 else -> when (tab) {
-                    0 -> HomeTab(ui, vm)
+                    0 -> HomeTab(ui, vm, onNavigate = { tab = it })
                     1 -> HeartTab(ui, vm)
                     2 -> SleepTab(ui, vm)
                     3 -> ActivityTab(ui, vm)
