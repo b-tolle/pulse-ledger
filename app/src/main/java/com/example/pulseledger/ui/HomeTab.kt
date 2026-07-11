@@ -23,8 +23,13 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int)
     val hasLoc = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     LaunchedEffect(Unit) { if (!hasLoc) locPerm.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
 
-    val charge = remember(ui.summaries, ui.stepsToday, ui.calendar, ui.hrvLatest) {
-        computeCharge(ui.summaries, ui.stepsToday, ui.calendar?.eventCount, ui.calendar?.busyMinutes, ui.hrvLatest)
+    val charge = remember(ui.summaries, ui.stepsToday, ui.calendar, ui.hrvLatest, ui.sleepNight) {
+        // Last night's Fitbit sleep session counts even before daily summaries update
+        val nightMin = ui.sleepNight
+            ?.takeIf { it.end >= System.currentTimeMillis() - 20 * 3_600_000L }
+            ?.let { ((it.end - it.start) / 60_000).toInt() }
+        computeCharge(ui.summaries, ui.stepsToday, ui.calendar?.eventCount,
+            ui.calendar?.busyMinutes, ui.hrvLatest, nightMin)
     }
     val stepWeek = remember(ui.summaries) { vm.weekly { it.steps?.toDouble() } }
 

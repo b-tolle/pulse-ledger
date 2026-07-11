@@ -31,10 +31,11 @@ fun computeCharge(
     meetings: Int? = null,
     busyMinutes: Int? = null,
     hrvLatest: Double? = null,
+    sleepOverrideMin: Int? = null,
 ): ChargeResult {
     val now = System.currentTimeMillis()
     val recent = summaries.filter { it.dayEpoch >= now - 3 * 86_400_000L }
-    val sleepMin = recent.lastOrNull { it.sleepMinutes != null }?.sleepMinutes
+    val sleepMin = sleepOverrideMin ?: recent.lastOrNull { it.sleepMinutes != null }?.sleepMinutes
     val stress = recent.lastOrNull { it.stressAvg != null }?.stressAvg
     val exercise = recent.lastOrNull { it.dayEpoch >= now - 86_400_000L }?.exerciseMin
 

@@ -25,9 +25,12 @@ import java.time.format.DateTimeFormatter
  * Dot colors use the same graded severity scale as the reading list.
  */
 @Composable
-fun PressureBandChart(readings: List<BpReading>) {
+fun PressureBandChart(readings: List<BpReading>, windowDays: Long? = null) {
     if (readings.size < 2) return
-    val pts = readings.sortedBy { it.epochMillis }.takeLast(40)
+    val cutoff = windowDays?.let { System.currentTimeMillis() - it * 86_400_000L } ?: 0L
+    val pts = readings.filter { it.epochMillis >= cutoff }
+        .sortedBy { it.epochMillis }.takeLast(120)
+    if (pts.size < 2) return
     val t0 = pts.first().epochMillis
     val t1 = pts.last().epochMillis.coerceAtLeast(t0 + 1)
     val appeared = remember { Animatable(0f) }
@@ -72,7 +75,7 @@ fun PressureBandChart(readings: List<BpReading>) {
         }
 
         // bands + severity dots, positioned on real time
-        val bw = ((w - padL - padR) / pts.size * 0.45f).coerceIn(6f, 14f)
+        val bw = ((w - padL - padR) / pts.size * 0.45f).coerceIn(3f, 14f)
         pts.forEachIndexed { i, r ->
             val grow = (appeared.value * pts.size - i).coerceIn(0f, 1f)
             if (grow <= 0f) return@forEachIndexed

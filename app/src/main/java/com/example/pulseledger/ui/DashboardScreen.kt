@@ -106,9 +106,27 @@ private fun PressureTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
         }
         item { LatestBpCard(ui) }
         if (ui.readings.size >= 2) item {
+            var bpRange by remember { mutableStateOf<Long?>(null) }   // null = All
+            val shown = remember(ui.readings, bpRange) {
+                val cut = bpRange?.let { System.currentTimeMillis() - it * 86_400_000L } ?: 0L
+                ui.readings.count { it.epochMillis >= cut }
+            }
             Card {
-                SectionLabel("PRESSURE BANDS · LAST 21 READINGS"); Spacer(Modifier.height(10.dp))
-                PressureBandChart(ui.readings)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionLabel("PRESSURE BANDS · $shown READINGS", Modifier.weight(1f))
+                    listOf("1M" to 30L, "3M" to 90L, "All" to null).forEach { (label, days) ->
+                        FilterChip(
+                            selected = bpRange == days, onClick = { bpRange = days },
+                            label = { Text(label, fontSize = 11.sp) },
+                            modifier = Modifier.padding(start = 6.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = PL.CardUp, selectedLabelColor = PL.Txt,
+                                containerColor = PL.Card, labelColor = PL.Dim),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                PressureBandChart(ui.readings, bpRange)
             }
         }
         // Medication effect: olmesartan 20mg started May 22, 2026
