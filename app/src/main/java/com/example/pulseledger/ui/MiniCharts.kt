@@ -10,26 +10,40 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
 
-/** Weekly bars with the last (today) highlighted. Empty values render as faint stubs. */
+/** Weekly bars with the last (today) highlighted. Empty values render as faint stubs.
+ *  Pass [labels] (e.g. day letters) to caption each bar. */
 @Composable
-fun WeekBars(values: List<Double?>, accent: Color, heightDp: Int = 44) {
+fun WeekBars(values: List<Double?>, accent: Color, heightDp: Int = 44, labels: List<String>? = null) {
     Canvas(Modifier.fillMaxWidth().height(heightDp.dp)) {
+        val labelPad = if (labels != null) 26f else 0f
         val n = values.size.coerceAtLeast(1)
         val gap = 6f
         val bw = (size.width - gap * (n - 1)) / n
+        val plotH = size.height - labelPad
         val maxV = values.filterNotNull().maxOrNull() ?: 1.0
         values.forEachIndexed { i, v ->
             val x = i * (bw + gap)
-            val h = if (v != null && maxV > 0) (size.height * (v / maxV)).toFloat().coerceAtLeast(3f) else 3f
+            val h = if (v != null && maxV > 0) (plotH * (v / maxV)).toFloat().coerceAtLeast(3f) else 3f
             val isLast = i == values.lastIndex
             drawRoundRect(
                 color = if (v == null) PL.Line else if (isLast) accent else accent.copy(alpha = 0.45f),
-                topLeft = Offset(x, size.height - h),
+                topLeft = Offset(x, plotH - h),
                 size = androidx.compose.ui.geometry.Size(bw, h),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f, 4f),
             )
+            if (labels != null) {
+                val label = labels.getOrNull(i) ?: ""
+                drawContext.canvas.nativeCanvas.drawText(
+                    label, x + bw / 2 - label.length * 6f, size.height - 4f,
+                    android.graphics.Paint().apply {
+                        color = if (isLast) android.graphics.Color.parseColor("#EAF0F9")
+                        else android.graphics.Color.parseColor("#5B6D8A")
+                        textSize = 22f
+                    })
+            }
         }
     }
 }

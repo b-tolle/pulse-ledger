@@ -48,6 +48,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val hrToday: List<Pair<Long, Long>> = emptyList(),
         val hrvLatest: Double? = null,
         val hrvWeek: List<Double?> = emptyList(),
+        val stepWeekLive: List<Double?> = emptyList(),
+        val weekLabels: List<String> = emptyList(),
         val sleepNight: HealthConnectManager.SleepNight? = null,
     )
 
@@ -87,6 +89,12 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     byDay[todayLocal.minusDays(it.toLong()).atStartOfDay(zoneId).toInstant().toEpochMilli()]
                 }
                 val avg7 = if (last7.isEmpty()) null else last7.sum() / last7.size
+                val stepWeekLive = (6 downTo 0).map { back ->
+                    byDay[todayLocal.minusDays(back.toLong()).atStartOfDay(zoneId).toInstant().toEpochMilli()]?.toDouble()
+                }
+                val weekLabels = (6 downTo 0).map { back ->
+                    todayLocal.minusDays(back.toLong()).dayOfWeek.name.take(1)
+                }
 
                 val rhr = hc.readRestingHeartRate(from, now)
                     .maxByOrNull { it.time }?.beatsPerMinute
@@ -137,6 +145,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     hrToday = hrToday,
                     hrvLatest = hrvNow,
                     hrvWeek = hrvWeek,
+                    stepWeekLive = stepWeekLive,
+                    weekLabels = weekLabels,
                     sleepNight = night,
                 )
             } catch (t: Throwable) {

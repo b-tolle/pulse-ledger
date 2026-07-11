@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun ActivityTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
-    val stepWeek = remember(ui.summaries) { vm.weekly { it.steps?.toDouble() } }
+    val stepWeek = ui.stepWeekLive
     val exWeek = remember(ui.summaries) { vm.weekly { it.exerciseMin?.toDouble() } }
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -28,7 +28,7 @@ fun ActivityTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
             Card {
                 SectionLabel("STEPS · LAST 7 DAYS")
                 Spacer(Modifier.height(10.dp))
-                if (stepWeek.any { it != null }) WeekBars(stepWeek, PL.Charge, 64) else EmptyChartSlot(64)
+                if (stepWeek.any { it != null }) WeekBars(stepWeek, PL.Charge, 72, labels = ui.weekLabels) else EmptyChartSlot(64)
             }
         }
         item {

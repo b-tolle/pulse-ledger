@@ -31,7 +31,7 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int)
         computeCharge(ui.summaries, ui.stepsToday, ui.calendar?.eventCount,
             ui.calendar?.busyMinutes, ui.hrvLatest, nightMin)
     }
-    val stepWeek = remember(ui.summaries) { vm.weekly { it.steps?.toDouble() } }
+    val stepWeek = ui.stepWeekLive
 
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -74,7 +74,7 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int)
                 }
                 MetricCard("Steps", ui.stepsToday?.let { "%,d".format(it) }, "", PL.Charge,
                     sub = ui.steps7dAvg?.let { "avg %,d".format(it) } ?: "", modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onNavigate(4) }) {
-                    WeekBars(stepWeek, PL.Charge)
+                    WeekBars(stepWeek, PL.Charge, labels = ui.weekLabels)
                 }
             }
         }
