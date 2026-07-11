@@ -205,78 +205,7 @@ private fun HistoryContent(ui: DashboardViewModel.Ui) {
     }
 }
 
-@Composable
-private fun MedEffectCard(ui: DashboardViewModel.Ui) {
-    // BP meds started May 22, 2026 (edit MED_START to adjust)
-    val MED_START = java.time.LocalDate.of(2026, 5, 22)
-        .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    val before = ui.readings.filter { it.epochMillis < MED_START }
-    val after = ui.readings.filter { it.epochMillis >= MED_START }
-    if (before.size < 3 || after.size < 3) return
-    fun avg(l: List<BpReading>, f: (BpReading) -> Int) = l.map(f).average().toInt()
-    val bS = avg(before) { it.systolic }; val bD = avg(before) { it.diastolic }
-    val aS = avg(after) { it.systolic }; val aD = avg(after) { it.diastolic }
-    Card {
-        SectionLabel("SINCE STARTING BP MEDS · MAY 22")
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Before (n=${before.size})", color = PL.Soft, fontSize = 12.sp)
-                Text("$bS/$bD", color = bpSeverityColor(bS, bD), fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-            }
-            Text("→", color = PL.Dim, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 10.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Since (n=${after.size})", color = PL.Soft, fontSize = 12.sp)
-                Text("$aS/$aD", color = bpSeverityColor(aS, aD), fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        val dS = aS - bS; val dD = aD - bD
-        Text(
-            "Change: ${if (dS <= 0) "" else "+"}$dS systolic, ${if (dD <= 0) "" else "+"}$dD diastolic. " +
-            "Numbers to bring to your prescriber — the app never advises dose changes.",
-            color = PL.Dim, fontSize = 11.5.sp, lineHeight = 16.sp,
-        )
-    }
-}
 
-/** Since-meds trend: first 2 weeks on olmesartan vs the most recent 2 weeks. */
-@Composable
-private fun MedEffectCard(readings: List<BpReading>) {
-    val medStart = 1_779_408_000_000L   // May 22, 2026 (olmesartan 20 mg start)
-    val twoWeeks = 14L * 86_400_000L
-    val early = readings.filter { it.epochMillis in medStart until (medStart + twoWeeks) }
-    val nowMs = System.currentTimeMillis()
-    val recent = readings.filter { it.epochMillis >= nowMs - twoWeeks }
-    if (early.size < 3 || recent.size < 2) return
-    fun avg(l: List<BpReading>, f: (BpReading) -> Int) = l.map(f).average().toInt()
-    val eS = avg(early) { it.systolic }; val eD = avg(early) { it.diastolic }
-    val rS = avg(recent) { it.systolic }; val rD = avg(recent) { it.diastolic }
-    Card {
-        SectionLabel("SINCE STARTING OLMESARTAN · MAY 22")
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("First 2 weeks", color = PL.Soft, fontSize = 12.sp)
-                Text("$eS/$eD", color = bpSeverityColor(eS, eD), fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                Text("n=${early.size}", color = PL.Dim, fontSize = 10.sp)
-            }
-            Text("→", color = PL.Dim, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Last 2 weeks", color = PL.Soft, fontSize = 12.sp)
-                Text("$rS/$rD", color = bpSeverityColor(rS, rD), fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                Text("n=${recent.size}", color = PL.Dim, fontSize = 10.sp)
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text("Systolic ${if (rS < eS) "down" else "up"} ${kotlin.math.abs(eS - rS)}, diastolic ${if (rD < eD) "down" else "up"} ${kotlin.math.abs(eD - rD)} mmHg. Bring this to your prescriber — the app never advises dose changes.",
-            color = PL.Soft, fontSize = 12.sp, lineHeight = 17.sp)
-    }
-}
 
 /* ── shared bits used by Data tab ── */
 @Composable
@@ -360,21 +289,22 @@ private fun LatestBpCard(ui: DashboardViewModel.Ui) {
 private fun fmtTime(epoch: Long): String =
     DateTimeFormatter.ofPattern("MMM d · h:mm a").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(epoch))
 
-/** Before/after view of BP since starting olmesartan 20mg on May 22, 2026. */
+/** Since starting olmesartan 20 mg (May 22, 2026): early weeks vs recent. */
 @Composable
 private fun MedEffectCard(readings: List<BpReading>) {
-    // May 22, 2026 00:00 UTC
     val medStart = 1_779_408_000_000L
     val after = readings.filter { it.epochMillis >= medStart }
     if (after.size < 6) return
     val sorted = after.sortedBy { it.epochMillis }
-    val firstWin = sorted.take(sorted.size / 3).ifEmpty { return }
-    val lastWin = sorted.takeLast(sorted.size / 3).ifEmpty { return }
+    val n = sorted.size / 3
+    if (n < 2) return
+    val firstWin = sorted.take(n)
+    val lastWin = sorted.takeLast(n)
     fun avg(l: List<BpReading>, f: (BpReading) -> Int) = l.map(f).average().toInt()
     val fs = avg(firstWin) { it.systolic }; val fd = avg(firstWin) { it.diastolic }
     val ls = avg(lastWin) { it.systolic }; val ld = avg(lastWin) { it.diastolic }
     Card {
-        SectionLabel("SINCE STARTING OLMESARTAN · MAY 22")
+        SectionLabel("SINCE STARTING OLMESARTAN \u00b7 MAY 22")
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -382,20 +312,20 @@ private fun MedEffectCard(readings: List<BpReading>) {
                 Text("$fs/$fd", color = bpSeverityColor(fs, fd), fontSize = 26.sp,
                     fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
-            Text("→", color = PL.Dim, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 10.dp))
+            Text("\u2192", color = PL.Dim, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 10.dp))
             Column(Modifier.weight(1f)) {
                 Text("Recent", color = PL.Soft, fontSize = 12.sp)
                 Text("$ls/$ld", color = bpSeverityColor(ls, ld), fontSize = 26.sp,
                     fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("Δ", color = PL.Dim, fontSize = 12.sp)
+                Text("\u0394", color = PL.Dim, fontSize = 12.sp)
                 Text("${ls - fs}/${ld - fd}", color = if (ls < fs) PL.Charge else PL.Drain,
                     fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text("Informational, not medical advice — but a useful picture to bring to your prescriber.",
+        Text("Informational, not medical advice \u2014 a useful picture for your prescriber.",
             color = PL.Dim, fontSize = 10.5.sp)
     }
 }
