@@ -115,6 +115,34 @@ class HealthConnectManager(private val context: Context) {
     suspend fun restingHrLatest(from: Instant, to: Instant): Long? =
         readRestingHeartRate(from, to).maxByOrNull { it.time }?.beatsPerMinute
 
+
+    /** All HR samples in range as (bpm, epochMs), time-sorted. */
+    suspend fun hrSamples(from: Instant, to: Instant): List<Pair<Long, Long>> {
+        val out = ArrayList<Pair<Long, Long>>()
+        for (r in readAll(HeartRateRecord::class, from, to))
+            for (smp in r.samples) out.add(smp.beatsPerMinute to smp.time.toEpochMilli())
+        out.sortBy { it.second }
+        return out
+    }
+
+    /** Latest HRV (RMSSD ms) sample, if any. */
+    suspend fun latestHrv(from: Instant, to: Instant): Double? =
+        readAll(HeartRateVariabilityRmssdRecord::class, from, to)
+            .maxByOrNull { it.time }?.heartRateVariabilityMillis
+
+    data class StageSpan(val type: Int, val start: Long, val end: Long)
+    data class SleepNight(val start: Long, val end: Long, val stages: List<StageSpan>)
+
+    /** Most recent sleep session (last 48h) with its stage spans, if recorded. */
+    suspend fun lastSleepSession(now: Instant): SleepNight? {
+        val sessions = readAll(SleepSessionRecord::class, now.minusSeconds(48 * 3600), now)
+        val latest = sessions.maxByOrNull { it.endTime } ?: return null
+        val stages = latest.stages.map {
+            StageSpan(it.stage, it.startTime.toEpochMilli(), it.endTime.toEpochMilli())
+        }.sortedBy { it.start }
+        return SleepNight(latest.startTime.toEpochMilli(), latest.endTime.toEpochMilli(), stages)
+    }
+
     private suspend fun <T : Record> readAll(
         type: kotlin.reflect.KClass<T>, from: Instant, to: Instant
     ): List<T> {

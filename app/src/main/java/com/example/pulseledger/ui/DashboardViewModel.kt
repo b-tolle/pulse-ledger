@@ -45,6 +45,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val latestHrSource: String? = null,
         val hrSampleCount: Int = 0,
         val hrSources: Set<String> = emptySet(),
+        val hrToday: List<Pair<Long, Long>> = emptyList(),
+        val hrvLatest: Double? = null,
+        val sleepNight: HealthConnectManager.SleepNight? = null,
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -85,6 +88,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     .maxByOrNull { it.time }?.beatsPerMinute
                 val latestHr = runCatching { hc.latestHeartRate(from, now) }.getOrNull()
                 val hrDiag = runCatching { hc.heartRateSources(from, now) }.getOrNull()
+                val dayStart = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant()
+                val hrToday = runCatching { hc.hrSamples(dayStart, now) }.getOrDefault(emptyList())
+                val hrvNow = runCatching { hc.latestHrv(now.minus(Duration.ofDays(2)), now) }.getOrNull()
+                val night = runCatching { hc.lastSleepSession(now) }.getOrNull()
 
                 val dao = Db.get(getApplication()).dao()
                 val histDays = dao.stepDaysCount()
@@ -118,6 +125,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     latestHrSource = latestHr?.third,
                     hrSampleCount = hrDiag?.first ?: 0,
                     hrSources = hrDiag?.second ?: emptySet(),
+                    hrToday = hrToday,
+                    hrvLatest = hrvNow,
+                    sleepNight = night,
                 )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(loading = false, error = t.message ?: "read failed")

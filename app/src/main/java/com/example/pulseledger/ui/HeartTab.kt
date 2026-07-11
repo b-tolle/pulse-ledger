@@ -4,16 +4,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.material3.Text
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
 fun HeartTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
     val rhrWeek = remember(ui.summaries) { vm.weekly { it.restingHr?.toDouble() } }
+    val todayBpm = ui.hrToday.map { it.first }
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -22,33 +21,41 @@ fun HeartTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
         item { AppHeader(ui, vm) }
         item {
             StatHeader("HEART RATE", (ui.latestHr ?: ui.restingHr)?.toString(), "bpm", PL.Sys,
-                listOf("Resting" to (ui.restingHr?.toString() ?: ""),
-                       "Samples" to (if (ui.hrSampleCount > 0) "${ui.hrSampleCount}" else "")))
-        }
-        item {
-            Card {
-                SectionLabel("HEART RATE SOURCES IN HEALTH CONNECT")
-                Spacer(Modifier.height(8.dp))
-                if (ui.hrSampleCount == 0) {
-                    Text("No heart-rate samples found in the last 30 days. Your Fitbit Air needs to be worn and synced (via the Fitbit or Google Health app) before HR appears here. It's normal for this to be empty while the Air is still calibrating.",
-                        color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
-                } else {
-                    Text("${ui.hrSampleCount} samples from: " +
-                        ui.hrSources.joinToString(", ") { it.substringAfterLast('.') },
-                        color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
-                    ui.latestHrSource?.let {
-                        Spacer(Modifier.height(4.dp))
-                        Text("Most recent: ${ui.latestHr} bpm via ${it.substringAfterLast('.')}",
-                            color = PL.Charge, fontSize = 12.sp)
-                    }
-                }
-            }
+                listOf(
+                    "Avg" to (todayBpm.takeIf { it.isNotEmpty() }?.average()?.toInt()?.toString() ?: ""),
+                    "Max" to (todayBpm.maxOrNull()?.toString() ?: ""),
+                    "Min" to (todayBpm.minOrNull()?.toString() ?: ""),
+                ))
         }
         item {
             Card {
                 SectionLabel("24-HOUR TIMELINE")
                 Spacer(Modifier.height(10.dp))
-                EmptyChartSlot(160, "Intraday heart rate arrives with the Fitbit Air")
+                if (ui.hrToday.size >= 2) IntradayHrChart(ui.hrToday)
+                else EmptyChartSlot(160, "No heart-rate samples yet today — wear and sync your Fitbit Air")
+            }
+        }
+        item {
+            Card {
+                SectionLabel("HRV")
+                Spacer(Modifier.height(8.dp))
+                if (ui.hrvLatest != null) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom) {
+                        Text("%.0f".format(ui.hrvLatest), color = PL.Sleep, fontSize = 38.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        Spacer(Modifier.width(6.dp))
+                        Text("ms rmssd", color = PL.Soft, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text("Measured overnight by your Fitbit Air. Higher generally means better recovery.",
+                        color = PL.Dim, fontSize = 11.5.sp, lineHeight = 16.sp)
+                } else {
+                    Text("HRV is measured during sleep — wear the Air overnight and it appears here after the morning sync.",
+                        color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
+                    Spacer(Modifier.height(10.dp))
+                    EmptyChartSlot(60, "HRV — after your first tracked night")
+                }
             }
         }
         item {
@@ -59,14 +66,13 @@ fun HeartTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                 else EmptyChartSlot(60, "No resting HR yet")
             }
         }
-        item {
+        if (ui.hrSampleCount > 0) item {
             Card {
-                SectionLabel("HRV")
-                Spacer(Modifier.height(8.dp))
-                Text("Heart-rate variability needs the Fitbit Air's overnight sensor. This card will fill in once it's syncing.",
-                    color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
-                Spacer(Modifier.height(10.dp))
-                EmptyChartSlot(70, "HRV — waiting on wearable")
+                SectionLabel("SOURCES")
+                Spacer(Modifier.height(6.dp))
+                Text("${ui.hrSampleCount} samples this month from " +
+                    ui.hrSources.joinToString(", ") { it.substringAfterLast('.') },
+                    color = PL.Dim, fontSize = 11.5.sp)
             }
         }
     }

@@ -131,7 +131,7 @@ private fun PressureContent(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
 private fun HistoryContent(ui: DashboardViewModel.Ui) {
     var range by remember { mutableStateOf(Range.ALL) }
     var selectedDay by remember { mutableStateOf<DailySummary?>(null) }
-    val insights = remember(ui.summaries) { mineInsights(ui.summaries) }
+    val insights = remember(ui.summaries, ui.locationDays) { mineInsights(ui.summaries, ui.locationDays) }
     selectedDay?.let { d -> DayDetailSheet(d, location = ui.locationDays[d.dayEpoch], onDismiss = { selectedDay = null }) }
     val now = System.currentTimeMillis()
     val scoped = remember(ui.summaries, range) {
@@ -248,13 +248,18 @@ private fun LatestBpCard(ui: DashboardViewModel.Ui) {
     }
 }
 
-@Composable private fun ReadingRow(r: BpReading) = Row(
-    Modifier.fillMaxWidth().background(PL.Card, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
-    verticalAlignment = Alignment.CenterVertically) {
-    Text(fmtTime(r.epochMillis), color = PL.Soft, fontSize = 12.sp, modifier = Modifier.weight(1f))
-    Text("${r.systolic}", color = PL.Sys, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
-    Text("/", color = PL.Dim, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
-    Text("${r.diastolic}", color = PL.Dia, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
+@Composable private fun ReadingRow(r: BpReading) {
+    val sev = bpSeverityColor(r.systolic, r.diastolic)
+    Row(
+        Modifier.fillMaxWidth().background(PL.Card, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(4.dp).height(26.dp).background(sev, RoundedCornerShape(2.dp)))
+        Spacer(Modifier.width(10.dp))
+        Text(fmtTime(r.epochMillis), color = PL.Soft, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Text("${r.systolic}", color = sev, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
+        Text("/", color = PL.Dim, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+        Text("${r.diastolic}", color = sev, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
+    }
 }
 
 @Composable private fun AddReadingDialog(onDismiss: () -> Unit, onSave: (Int, Int, Int?) -> Unit) {

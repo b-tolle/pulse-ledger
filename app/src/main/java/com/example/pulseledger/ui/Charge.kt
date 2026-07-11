@@ -30,6 +30,7 @@ fun computeCharge(
     stepsToday: Long?,
     meetings: Int? = null,
     busyMinutes: Int? = null,
+    hrvLatest: Double? = null,
 ): ChargeResult {
     val now = System.currentTimeMillis()
     val recent = summaries.filter { it.dayEpoch >= now - 3 * 86_400_000L }
@@ -54,6 +55,13 @@ fun computeCharge(
     stress?.let {
         val drain = (it / 4).toInt().coerceAtMost(15)
         if (drain > 0) { v -= drain; contributors += "Stress · avg %.0f".format(it) to -drain }
+    }
+    if (hrvLatest != null) {
+        val hist = summaries.mapNotNull { it.hrvRmssd }
+        val baseline = if (hist.size >= 5) hist.takeLast(60).average() else 55.0
+        val adj = ((hrvLatest - baseline) / 3.0).toInt().coerceIn(-10, 10)
+        v += adj
+        contributors += "HRV · %.0f ms (baseline %.0f)".format(hrvLatest, baseline) to adj
     }
     if (meetings != null && meetings > 0) {
         val drain = (meetings * 2 + (busyMinutes ?: 0) / 60).coerceAtMost(18)

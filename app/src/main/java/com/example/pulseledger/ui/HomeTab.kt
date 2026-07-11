@@ -23,8 +23,8 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int)
     val hasLoc = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     LaunchedEffect(Unit) { if (!hasLoc) locPerm.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
 
-    val charge = remember(ui.summaries, ui.stepsToday, ui.calendar) {
-        computeCharge(ui.summaries, ui.stepsToday, ui.calendar?.eventCount, ui.calendar?.busyMinutes)
+    val charge = remember(ui.summaries, ui.stepsToday, ui.calendar, ui.hrvLatest) {
+        computeCharge(ui.summaries, ui.stepsToday, ui.calendar?.eventCount, ui.calendar?.busyMinutes, ui.hrvLatest)
     }
     val stepWeek = remember(ui.summaries) { vm.weekly { it.steps?.toDouble() } }
 
@@ -52,7 +52,7 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int)
                             Text(what, color = PL.Txt, fontSize = 13.sp)
                         }
                     }
-                    Text("HRV joins the formula when your Fitbit Air arrives",
+                    if (ui.hrvLatest == null) Text("HRV joins the formula after your first tracked night",
                         color = PL.Dim, fontSize = 10.5.sp, modifier = Modifier.padding(top = 6.dp))
                 }
             }

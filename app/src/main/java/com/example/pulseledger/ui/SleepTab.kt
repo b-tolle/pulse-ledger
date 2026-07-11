@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.material3.Text
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -13,7 +12,14 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun SleepTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
     val sleepWeek = remember(ui.summaries) { vm.weekly { it.sleepMinutes?.toDouble() } }
-    val lastSleep = ui.summaries.lastOrNull { it.sleepMinutes != null }?.sleepMinutes
+    val night = ui.sleepNight
+    val stageMin: (Set<Int>) -> Int = { types ->
+        night?.stages?.filter { it.type in types }?.sumOf { (it.end - it.start) / 60_000 }?.toInt() ?: 0
+    }
+    val deep = stageMin(setOf(5)); val rem = stageMin(setOf(6)); val light = stageMin(setOf(2, 4, 0))
+    val totalMin = night?.let { ((it.end - it.start) / 60_000).toInt() }
+        ?: ui.summaries.lastOrNull { it.sleepMinutes != null }?.sleepMinutes
+
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -22,14 +28,19 @@ fun SleepTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
         item { AppHeader(ui, vm) }
         item {
             StatHeader("LAST NIGHT",
-                lastSleep?.let { "%d:%02d".format(it / 60, it % 60) }, "hrs", PL.Sleep,
-                listOf("Deep" to "", "REM" to "", "Light" to ""))
+                totalMin?.let { "%d:%02d".format(it / 60, it % 60) }, "hrs", PL.Sleep,
+                listOf(
+                    "Deep" to (if (deep > 0) "%dh%02dm".format(deep / 60, deep % 60) else ""),
+                    "REM" to (if (rem > 0) "%dh%02dm".format(rem / 60, rem % 60) else ""),
+                    "Light" to (if (light > 0) "%dh%02dm".format(light / 60, light % 60) else ""),
+                ))
         }
         item {
             Card {
                 SectionLabel("STAGE TIMELINE")
                 Spacer(Modifier.height(10.dp))
-                EmptyChartSlot(160, "Sleep stages (deep/REM/light) arrive with the Fitbit Air")
+                if (night != null && night.stages.isNotEmpty()) Hypnogram(night)
+                else EmptyChartSlot(150, "Sleep stages appear after a night wearing the Fitbit Air")
             }
         }
         item {
