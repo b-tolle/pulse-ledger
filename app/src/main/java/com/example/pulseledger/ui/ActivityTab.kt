@@ -39,5 +39,6 @@ fun ActivityTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                 else EmptyChartSlot(64, "No workouts logged")
             }
         }
+        item { PeerCard(activityRanges(ui)) }
     }
 }

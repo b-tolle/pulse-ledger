@@ -73,6 +73,7 @@ fun HeartTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                 else EmptyChartSlot(60, "No resting HR yet")
             }
         }
+        item { PeerCard(heartRanges(ui)) }
         if (ui.hrSampleCount > 0) item {
             Card {
                 SectionLabel("SOURCES")

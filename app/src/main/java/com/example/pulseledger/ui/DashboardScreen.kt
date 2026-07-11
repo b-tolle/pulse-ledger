@@ -91,14 +91,18 @@ private fun DataTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
     var sub by remember { mutableStateOf(0) }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("History", "Activity").forEachIndexed { i, label ->
+            listOf("History", "Activity", "Ranges").forEachIndexed { i, label ->
                 FilterChip(selected = sub == i, onClick = { sub = i }, label = { Text(label) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = PL.CardUp, selectedLabelColor = PL.Txt,
                         containerColor = PL.Card, labelColor = PL.Dim))
             }
         }
-        if (sub == 0) HistoryContent(ui) else ActivityTab(ui, vm)
+        when (sub) {
+            0 -> HistoryContent(ui)
+            1 -> ActivityTab(ui, vm)
+            else -> RangesContent(ui)
+        }
     }
 }
 
@@ -167,6 +171,7 @@ private fun PressureTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                     }
                 }
             }
+            item { PeerCard(pressureRanges(ui)) }
             item { SectionLabel("RECENT READINGS") }
             items(ui.readings.take(30)) { ReadingRow(it) }
         }
@@ -407,4 +412,35 @@ private fun buildBpReport(readings: List<BpReading>): String {
             (r.pulse?.let { "  pulse $it" } ?: ""))
     }
     return sb.toString()
+}
+
+
+/** Full peer-comparison summary: every range band, grouped by area. */
+@Composable
+private fun RangesContent(ui: DashboardViewModel.Ui) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 20.dp)) {
+        item {
+            Text("How you compare", color = PL.Txt, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Against typical ranges for ${Peer.LABEL.lowercase()} · population norms, not goals",
+                color = PL.Soft, fontSize = 12.sp)
+        }
+        val groups = listOf(
+            "BLOOD PRESSURE" to pressureRanges(ui),
+            "HEART" to heartRanges(ui),
+            "SLEEP" to sleepRanges(ui),
+            "ACTIVITY" to activityRanges(ui),
+        ).filter { it.second.isNotEmpty() }
+        items(groups) { (title, specs) ->
+            Card {
+                SectionLabel(title)
+                Spacer(Modifier.height(6.dp))
+                specs.forEach { RangeBand(it) }
+            }
+        }
+        item {
+            Text("Ranges are published population norms for your peer group — context for reading your own numbers, not medical targets.",
+                color = PL.Dim, fontSize = 10.5.sp, lineHeight = 15.sp)
+        }
+    }
 }

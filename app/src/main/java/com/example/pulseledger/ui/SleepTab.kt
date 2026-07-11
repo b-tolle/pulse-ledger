@@ -51,5 +51,6 @@ fun SleepTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                 else EmptyChartSlot(60, "No sleep data yet")
             }
         }
+        item { PeerCard(sleepRanges(ui)) }
     }
 }
