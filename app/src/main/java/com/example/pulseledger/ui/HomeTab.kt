@@ -61,12 +61,11 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int)
         // Two-column metric grid
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard("Heart Rate", ui.restingHr?.toString(), "bpm", PL.Sys,
-                    sub = "resting today", modifier = Modifier.weight(1f), onClick = { onNavigate(1) }) {
-                    EmptyChartSlot(40, "Live HR needs Fitbit Air")
-                }
+                MetricCard("Heart Rate", (ui.latestHr ?: ui.restingHr)?.toString(), "bpm", PL.Sys,
+                    sub = if (ui.latestHr != null) "live · tap for detail" else "resting today",
+                    onClick = { onNavigate(2) }, modifier = Modifier.weight(1f))
                 MetricCard("Steps", ui.stepsToday?.let { "%,d".format(it) }, "", PL.Charge,
-                    sub = ui.steps7dAvg?.let { "avg %,d".format(it) } ?: "", modifier = Modifier.weight(1f), onClick = { onNavigate(3) }) {
+                    sub = ui.steps7dAvg?.let { "avg %,d".format(it) } ?: "", modifier = Modifier.weight(1f), onClick = { onNavigate(4) }) {
                     WeekBars(stepWeek, PL.Charge)
                 }
             }

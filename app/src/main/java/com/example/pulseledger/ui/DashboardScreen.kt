@@ -32,8 +32,8 @@ fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequest
     LaunchedEffect(permissionsGranted) { if (permissionsGranted) vm.load() }
 
     val tabs = listOf(
-        Triple("Home", "\u2302", 0), Triple("Heart", "\u2665", 1),
-        Triple("Sleep", "\u263D", 2), Triple("Activity", "\u26A1", 3),
+        Triple("Home", "\u2302", 0), Triple("Pressure", "\u25C9", 1),
+        Triple("Heart", "\u2665", 2), Triple("Sleep", "\u263D", 3),
         Triple("Data", "\u2317", 4),
     )
     Scaffold(
@@ -65,9 +65,9 @@ fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequest
                 }
                 else -> when (tab) {
                     0 -> HomeTab(ui, vm, onNavigate = { tab = it })
-                    1 -> HeartTab(ui, vm)
-                    2 -> SleepTab(ui, vm)
-                    3 -> ActivityTab(ui, vm)
+                    1 -> PressureTab(ui, vm)
+                    2 -> HeartTab(ui, vm)
+                    3 -> SleepTab(ui, vm)
                     else -> DataTab(ui, vm)
                 }
             }
@@ -81,23 +81,24 @@ private fun DataTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
     var sub by remember { mutableStateOf(0) }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("Pressure", "History").forEachIndexed { i, label ->
+            listOf("History", "Activity").forEachIndexed { i, label ->
                 FilterChip(selected = sub == i, onClick = { sub = i }, label = { Text(label) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = PL.CardUp, selectedLabelColor = PL.Txt,
                         containerColor = PL.Card, labelColor = PL.Dim))
             }
         }
-        if (sub == 0) PressureContent(ui, vm) else HistoryContent(ui)
+        if (sub == 0) HistoryContent(ui) else ActivityTab(ui, vm)
     }
 }
 
 @Composable
-private fun PressureContent(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
+private fun PressureTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
     var showAdd by remember { mutableStateOf(false) }
     if (showAdd) AddReadingDialog(onDismiss = { showAdd = false }, onSave = { s, d, p -> showAdd = false; vm.addManual(s, d, p) })
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 20.dp)) {
+        verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(top = 16.dp, bottom = 20.dp)) {
+        item { AppHeader(ui, vm) }
         item {
             OutlinedButton(onClick = { showAdd = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("+ Add reading", color = PL.Dia)
@@ -112,7 +113,6 @@ private fun PressureContent(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
         }
         // Medication effect: olmesartan 20mg started May 22, 2026
         item { MedEffectCard(ui.readings) }
-        item { MedEffectCard(ui) }
         if (ui.readings.isNotEmpty()) {
             item {
                 Card {
@@ -289,22 +289,22 @@ private fun LatestBpCard(ui: DashboardViewModel.Ui) {
 private fun fmtTime(epoch: Long): String =
     DateTimeFormatter.ofPattern("MMM d · h:mm a").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(epoch))
 
-/** Since starting olmesartan 20 mg (May 22, 2026): early weeks vs recent. */
+
+
+
+/** BP trend since starting olmesartan 20 mg (May 22, 2026): early window vs recent. */
 @Composable
 private fun MedEffectCard(readings: List<BpReading>) {
     val medStart = 1_779_408_000_000L
-    val after = readings.filter { it.epochMillis >= medStart }
+    val after = readings.filter { it.epochMillis >= medStart }.sortedBy { it.epochMillis }
     if (after.size < 6) return
-    val sorted = after.sortedBy { it.epochMillis }
-    val n = sorted.size / 3
-    if (n < 2) return
-    val firstWin = sorted.take(n)
-    val lastWin = sorted.takeLast(n)
+    val n = after.size / 3
+    val firstWin = after.take(n); val lastWin = after.takeLast(n)
     fun avg(l: List<BpReading>, f: (BpReading) -> Int) = l.map(f).average().toInt()
     val fs = avg(firstWin) { it.systolic }; val fd = avg(firstWin) { it.diastolic }
     val ls = avg(lastWin) { it.systolic }; val ld = avg(lastWin) { it.diastolic }
     Card {
-        SectionLabel("SINCE STARTING OLMESARTAN \u00b7 MAY 22")
+        SectionLabel("SINCE STARTING OLMESARTAN · MAY 22")
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -312,20 +312,20 @@ private fun MedEffectCard(readings: List<BpReading>) {
                 Text("$fs/$fd", color = bpSeverityColor(fs, fd), fontSize = 26.sp,
                     fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
-            Text("\u2192", color = PL.Dim, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 10.dp))
+            Text("→", color = PL.Dim, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 10.dp))
             Column(Modifier.weight(1f)) {
                 Text("Recent", color = PL.Soft, fontSize = 12.sp)
                 Text("$ls/$ld", color = bpSeverityColor(ls, ld), fontSize = 26.sp,
                     fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("\u0394", color = PL.Dim, fontSize = 12.sp)
+                Text("Δ", color = PL.Dim, fontSize = 12.sp)
                 Text("${ls - fs}/${ld - fd}", color = if (ls < fs) PL.Charge else PL.Drain,
                     fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text("Informational, not medical advice \u2014 a useful picture for your prescriber.",
+        Text("Informational, not medical advice — a picture to bring to your prescriber.",
             color = PL.Dim, fontSize = 10.5.sp)
     }
 }
