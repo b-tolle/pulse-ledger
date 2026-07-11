@@ -133,6 +133,16 @@ class HealthConnectManager(private val context: Context) {
         readAll(HeartRateVariabilityRmssdRecord::class, from, to)
             .maxByOrNull { it.time }?.heartRateVariabilityMillis
 
+    /** Per-local-day average HRV, for weekly trends. */
+    suspend fun dailyHrv(from: Instant, to: Instant): Map<Long, Double> {
+        val zone = ZoneId.systemDefault()
+        return readAll(HeartRateVariabilityRmssdRecord::class, from, to)
+            .groupBy {
+                it.time.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
+            }
+            .mapValues { (_, v) -> v.map { it.heartRateVariabilityMillis }.average() }
+    }
+
     data class StageSpan(val type: Int, val start: Long, val end: Long)
     data class SleepNight(val start: Long, val end: Long, val stages: List<StageSpan>)
 

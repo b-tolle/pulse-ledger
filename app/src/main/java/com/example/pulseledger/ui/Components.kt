@@ -1,6 +1,7 @@
 package com.example.pulseledger.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,7 +25,8 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) =
 @Composable
 fun Card(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) = Column(
     modifier.fillMaxWidth()
-        .background(Brush.verticalGradient(listOf(PL.CardUp.copy(alpha = 0.5f), PL.Card)), RoundedCornerShape(20.dp))
+        .background(PL.Card, RoundedCornerShape(16.dp))
+        .border(1.dp, PL.Line, RoundedCornerShape(16.dp))
         .padding(16.dp),
     content = content,
 )

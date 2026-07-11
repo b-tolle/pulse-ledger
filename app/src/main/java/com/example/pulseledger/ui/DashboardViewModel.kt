@@ -47,6 +47,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val hrSources: Set<String> = emptySet(),
         val hrToday: List<Pair<Long, Long>> = emptyList(),
         val hrvLatest: Double? = null,
+        val hrvWeek: List<Double?> = emptyList(),
         val sleepNight: HealthConnectManager.SleepNight? = null,
     )
 
@@ -94,6 +95,11 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val dayStart = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant()
                 val hrToday = runCatching { hc.hrSamples(dayStart, now) }.getOrDefault(emptyList())
                 val hrvNow = runCatching { hc.latestHrv(now.minus(Duration.ofDays(2)), now) }.getOrNull()
+                val hrvByDay = runCatching { hc.dailyHrv(now.minus(Duration.ofDays(8)), now) }.getOrDefault(emptyMap())
+                val hrvWeek = (6 downTo 0).map { back ->
+                    hrvByDay[java.time.LocalDate.now(zoneId2()).minusDays(back.toLong())
+                        .atStartOfDay(zoneId2()).toInstant().toEpochMilli()]
+                }
                 val night = runCatching { hc.lastSleepSession(now) }.getOrNull()
 
                 val dao = Db.get(getApplication()).dao()
@@ -130,6 +136,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     hrSources = hrDiag?.second ?: emptySet(),
                     hrToday = hrToday,
                     hrvLatest = hrvNow,
+                    hrvWeek = hrvWeek,
                     sleepNight = night,
                 )
             } catch (t: Throwable) {
@@ -137,6 +144,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    private fun zoneId2() = java.time.ZoneId.systemDefault()
 
     fun weekly(pick: (com.example.pulseledger.data.db.DailySummary) -> Double?): List<Double?> {
         val now = System.currentTimeMillis(); val dayMs = 86_400_000L

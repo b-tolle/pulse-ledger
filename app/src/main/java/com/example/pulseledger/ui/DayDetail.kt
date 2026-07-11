@@ -107,7 +107,7 @@ fun DayDetailSheet(day: DailySummary, location: LocationDay? = null, onDismiss: 
 
             // ── External links ──
             Spacer(Modifier.height(20.dp))
-            LinkButton("🗺  Open Maps Timeline") {
+            LinkButton("Open Maps Timeline") {
                 val i = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/timeline"))
                     .setPackage("com.google.android.apps.maps")
                 runCatching { ctx.startActivity(i) }.onFailure {
@@ -115,7 +115,7 @@ fun DayDetailSheet(day: DailySummary, location: LocationDay? = null, onDismiss: 
                 }
             }
             Spacer(Modifier.height(8.dp))
-            LinkButton("💜  Open Samsung Health") {
+            LinkButton("Open Samsung Health") {
                 ctx.packageManager.getLaunchIntentForPackage("com.sec.android.app.shealth")
                     ?.let { runCatching { ctx.startActivity(it) } }
             }

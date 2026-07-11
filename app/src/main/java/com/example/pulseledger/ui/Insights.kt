@@ -8,7 +8,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.sqrt
 
-data class Insight(val emoji: String, val title: String, val body: String)
+data class Insight(val emoji: String, val title: String, val body: String, val accent: Long = 0xFF8CA0BE)
 
 /** Real findings mined from the imported archive — not just charts. */
 fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = emptyMap()): List<Insight> {
@@ -18,7 +18,7 @@ fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = e
 
     // Record step day
     s.filter { (it.steps ?: 0) > 0 }.maxByOrNull { it.steps!! }?.let {
-        out += Insight("🏆", "Biggest day ever",
+        out += Insight("", "Biggest day ever",
             "%,d steps on %s. What were you doing?".format(it.steps, fmt.format(Instant.ofEpochMilli(it.dayEpoch))))
     }
 
@@ -32,9 +32,9 @@ fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = e
         val diff = ((we - wk) / wk * 100).toInt()
         val weS = "%,.0f".format(we); val wkS = "%,.0f".format(wk)
         out += if (diff >= 0)
-            Insight("🌤", "Weekend walker", "You move $diff% more on weekends ($weS vs $wkS steps).")
+            Insight("", "Weekend walker", "You move $diff% more on weekends ($weS vs $wkS steps).")
         else
-            Insight("💼", "Weekday mover", "You move ${-diff}% more on weekdays ($wkS vs $weS steps).")
+            Insight("", "Weekday mover", "You move ${-diff}% more on weekdays ($wkS vs $weS steps).")
     }
 
     // Stress ↔ sleep correlation (same-day)
@@ -46,10 +46,10 @@ fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = e
     if (pairs.size >= 20) {
         val r = pearson(pairs)
         if (r != null && r < -0.15)
-            out += Insight("😮‍💨", "Sleep fights stress",
+            out += Insight("", "Sleep fights stress",
                 "Across ${pairs.size} tracked days, more sleep lines up with lower stress scores (r=%.2f).".format(r))
         else if (r != null && r > 0.15)
-            out += Insight("🤔", "Odd pattern",
+            out += Insight("", "Odd pattern",
                 "Your higher-stress days actually show more sleep (r=%.2f) — worth watching.".format(r))
     }
 
@@ -59,9 +59,9 @@ fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = e
         val first = rhr.take(rhr.size / 3).map { it.restingHr!!.toDouble() }.average()
         val last = rhr.takeLast(rhr.size / 3).map { it.restingHr!!.toDouble() }.average()
         val d = (last - first).toInt()
-        if (d <= -2) out += Insight("💪", "Heart getting stronger",
+        if (d <= -2) out += Insight("", "Heart getting stronger",
             "Your resting HR dropped from %.0f to %.0f bpm across your tracked history.".format(first, last))
-        else if (d >= 3) out += Insight("📈", "Resting HR creeping up",
+        else if (d >= 3) out += Insight("", "Resting HR creeping up",
             "From %.0f to %.0f bpm over your tracked history — one to keep an eye on.".format(first, last))
     }
 
@@ -70,7 +70,7 @@ fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = e
     if (sleeps.size >= 30) {
         val mean = sleeps.average()
         val sd = sqrt(sleeps.sumOf { (it - mean) * (it - mean) } / sleeps.size)
-        out += Insight("🛏", "Sleep rhythm",
+        out += Insight("", "Sleep rhythm",
             "Average night: %dh %02dm, swinging ±%d min. Consistency matters as much as duration.".format(
                 (mean / 60).toInt(), (mean % 60).toInt(), sd.toInt()))
     }
@@ -98,7 +98,7 @@ fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = e
             var body = "Office days: %,.0f steps avg vs %,.0f on other days.".format(wSteps, oSteps)
             if (wStress.size >= 5 && oStress.size >= 5)
                 body += " Stress runs %.0f at work vs %.0f off.".format(wStress.average(), oStress.average())
-            out += Insight("🏢", "Work-day effect", body)
+            out += Insight("", "Work-day effect", body, 0xFF5B9BFF)
         }
     }
 

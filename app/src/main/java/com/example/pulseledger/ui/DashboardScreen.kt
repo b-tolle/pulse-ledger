@@ -6,6 +6,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Bloodtype
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -32,9 +40,11 @@ fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequest
     LaunchedEffect(permissionsGranted) { if (permissionsGranted) vm.load() }
 
     val tabs = listOf(
-        Triple("Home", "\u2302", 0), Triple("Pressure", "\u25C9", 1),
-        Triple("Heart", "\u2665", 2), Triple("Sleep", "\u263D", 3),
-        Triple("Data", "\u2317", 4),
+        Triple("Home", Icons.Outlined.Home, 0),
+        Triple("Pressure", Icons.Outlined.Bloodtype, 1),
+        Triple("Heart", Icons.Outlined.MonitorHeart, 2),
+        Triple("Sleep", Icons.Outlined.Bedtime, 3),
+        Triple("Data", Icons.Outlined.Insights, 4),
     )
     Scaffold(
         containerColor = PL.Bg,
@@ -43,7 +53,7 @@ fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequest
                 tabs.forEach { (label, icon, i) ->
                     NavigationBarItem(
                         selected = tab == i, onClick = { tab = i },
-                        icon = { Text(icon, fontSize = 17.sp) },
+                        icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp)) },
                         label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = PL.Txt, selectedTextColor = PL.Txt,
@@ -100,8 +110,23 @@ private fun PressureTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(top = 16.dp, bottom = 20.dp)) {
         item { AppHeader(ui, vm) }
         item {
-            OutlinedButton(onClick = { showAdd = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("+ Add reading", color = PL.Dia)
+            val ctx = LocalContext.current
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { showAdd = true }, modifier = Modifier.weight(1f)) {
+                    Text("Add reading", color = PL.Dia)
+                }
+                OutlinedButton(
+                    onClick = {
+                        val report = buildBpReport(ui.readings)
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "Blood pressure report")
+                            putExtra(Intent.EXTRA_TEXT, report)
+                        }
+                        runCatching { ctx.startActivity(Intent.createChooser(send, "Share BP report")) }
+                    },
+                    modifier = Modifier.weight(1f),
+                ) { Text("Share report", color = PL.Soft) }
             }
         }
         item { LatestBpCard(ui) }
@@ -181,9 +206,14 @@ private fun HistoryContent(ui: DashboardViewModel.Ui) {
                     SectionLabel("PERSONAL RECORDS · TAP TO SEE THE DAY")
                     recs.forEach { r ->
                         val day = r.dayEpoch?.let { ep -> ui.summaries.firstOrNull { it.dayEpoch == ep } }
+                        val accent = when (r.label) {
+                            "Most steps" -> PL.Charge; "Lowest RHR" -> PL.Sys
+                            "Longest sleep" -> PL.Sleep; else -> PL.Dia
+                        }
                         Row(Modifier.fillMaxWidth().clickable(enabled = day != null) { day?.let { selectedDay = it } }.padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            Text(r.emoji, fontSize = 18.sp, modifier = Modifier.padding(end = 10.dp))
+                            Box(Modifier.size(8.dp).background(accent, RoundedCornerShape(4.dp)))
+                            Spacer(Modifier.width(10.dp))
                             Text(r.label, color = PL.Soft, fontSize = 13.sp, modifier = Modifier.weight(1f))
                             Text(r.value, color = PL.Txt, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
                             if (day != null) Text("  ›", color = PL.Dim, fontSize = 18.sp)
@@ -194,7 +224,9 @@ private fun HistoryContent(ui: DashboardViewModel.Ui) {
             items(insights) { ins ->
                 Card {
                     Row(verticalAlignment = Alignment.Top) {
-                        Text(ins.emoji, fontSize = 22.sp, modifier = Modifier.padding(end = 12.dp))
+                        Box(Modifier.padding(top = 3.dp).size(width = 3.dp, height = 30.dp)
+                            .background(Color(ins.accent), RoundedCornerShape(2.dp)))
+                        Spacer(Modifier.width(12.dp))
                         Column {
                             Text(ins.title, color = PL.Txt, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(2.dp)); Text(ins.body, color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
@@ -339,7 +371,7 @@ private fun MedEffectCard(readings: List<BpReading>) {
                     fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("Δ", color = PL.Dim, fontSize = 12.sp)
+                Text("Change", color = PL.Dim, fontSize = 12.sp)
                 Text("${ls - fs}/${ld - fd}", color = if (ls < fs) PL.Charge else PL.Drain,
                     fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
@@ -348,4 +380,31 @@ private fun MedEffectCard(readings: List<BpReading>) {
         Text("Informational, not medical advice — a picture to bring to your prescriber.",
             color = PL.Dim, fontSize = 10.5.sp)
     }
+}
+
+
+/** Plain-text BP summary a prescriber can actually read. */
+private fun buildBpReport(readings: List<BpReading>): String {
+    val fmt = DateTimeFormatter.ofPattern("MM/dd/yyyy h:mm a").withZone(ZoneId.systemDefault())
+    val sorted = readings.sortedByDescending { it.epochMillis }
+    val sb = StringBuilder()
+    sb.appendLine("BLOOD PRESSURE REPORT — Pulse Ledger")
+    sb.appendLine("Generated ${DateTimeFormatter.ofPattern("MMMM d, yyyy").withZone(ZoneId.systemDefault()).format(Instant.now())}")
+    sb.appendLine("Medication: olmesartan 20 mg daily, started May 22, 2026")
+    sb.appendLine()
+    val medStart = 1_779_408_000_000L
+    val after = readings.filter { it.epochMillis >= medStart }.sortedBy { it.epochMillis }
+    if (after.size >= 6) {
+        val n = after.size / 3
+        fun avg(l: List<BpReading>, f: (BpReading) -> Int) = l.map(f).average().toInt()
+        val f = after.take(n); val l = after.takeLast(n)
+        sb.appendLine("Since starting medication: ${avg(f){it.systolic}}/${avg(f){it.diastolic}} (first weeks) → ${avg(l){it.systolic}}/${avg(l){it.diastolic}} (recent)")
+        sb.appendLine()
+    }
+    sb.appendLine("READINGS (newest first):")
+    sorted.take(90).forEach { r ->
+        sb.appendLine("${fmt.format(Instant.ofEpochMilli(r.epochMillis))}  ${r.systolic}/${r.diastolic}" +
+            (r.pulse?.let { "  pulse $it" } ?: ""))
+    }
+    return sb.toString()
 }

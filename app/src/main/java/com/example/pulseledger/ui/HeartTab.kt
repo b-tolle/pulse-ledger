@@ -48,8 +48,15 @@ fun HeartTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                         Text("ms rmssd", color = PL.Soft, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
                     }
                     Spacer(Modifier.height(4.dp))
-                    Text("Measured overnight by your Fitbit Air. Higher generally means better recovery.",
+                    Text("Measured overnight. Higher generally means better recovery — judge against your own baseline, not others'.",
                         color = PL.Dim, fontSize = 11.5.sp, lineHeight = 16.sp)
+                    if (ui.hrvWeek.count { it != null } >= 2) {
+                        Spacer(Modifier.height(12.dp))
+                        Text("LAST 7 NIGHTS", color = PL.Soft, fontSize = 10.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, letterSpacing = 1.2.sp)
+                        Spacer(Modifier.height(6.dp))
+                        WeekBars(ui.hrvWeek, PL.Sleep, 44)
+                    }
                 } else {
                     Text("HRV is measured during sleep — wear the Air overnight and it appears here after the morning sync.",
                         color = PL.Soft, fontSize = 13.sp, lineHeight = 18.sp)
