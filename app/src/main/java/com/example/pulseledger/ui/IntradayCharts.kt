@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
@@ -99,8 +100,11 @@ fun Hypnogram(night: HealthConnectManager.SleepNight, heightDp: Int = 150) {
         labels.forEachIndexed { i, lab ->
             drawContext.canvas.nativeCanvas.drawText(lab, 8f, padT + rowH * i + rowH / 2 + 8f, axisPaint())
         }
-        // Connectors first (under the blocks): thin gradient lines linking
-        // consecutive stages, fading from the previous color to the next.
+        // Connectors run EDGE to EDGE — from the face of the block being left
+        // to the face of the block being entered — with round caps, so they
+        // pour into the pills instead of spearing through them.
+        fun blockTop(r: Int) = padT + rowH * r + rowH * 0.20f
+        fun blockBot(r: Int) = blockTop(r) + rowH * 0.60f
         var prevSpan: HealthConnectManager.StageSpan? = null
         night.stages.forEach { sp ->
             val r = row(sp.type) ?: return@forEach
@@ -108,16 +112,19 @@ fun Hypnogram(night: HealthConnectManager.SleepNight, heightDp: Int = 150) {
                 val pr = row(pv.type)
                 if (pr != null && pr != r) {
                     val cxLine = x(sp.start)
-                    val yA = padT + rowH * pr + rowH / 2f
-                    val yB = padT + rowH * r + rowH / 2f
+                    val movingDown = r > pr
+                    val yFrom = if (movingDown) blockBot(pr) - 4f else blockTop(pr) + 4f
+                    val yTo = if (movingDown) blockTop(r) + 4f else blockBot(r) - 4f
+                    val topColor = if (yFrom < yTo) rowColor[pr] else rowColor[r]
+                    val botColor = if (yFrom < yTo) rowColor[r] else rowColor[pr]
                     drawLine(
                         brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                            colors = if (yA < yB) listOf(rowColor[pr].copy(alpha = 0.55f), rowColor[r].copy(alpha = 0.55f))
-                                     else listOf(rowColor[r].copy(alpha = 0.55f), rowColor[pr].copy(alpha = 0.55f)),
-                            startY = minOf(yA, yB), endY = maxOf(yA, yB),
+                            colors = listOf(topColor.copy(alpha = 0.85f), botColor.copy(alpha = 0.85f)),
+                            startY = minOf(yFrom, yTo), endY = maxOf(yFrom, yTo),
                         ),
-                        start = Offset(cxLine, yA), end = Offset(cxLine, yB),
-                        strokeWidth = 3.5f,
+                        start = Offset(cxLine, yFrom), end = Offset(cxLine, yTo),
+                        strokeWidth = 5f,
+                        cap = StrokeCap.Round,
                     )
                 }
             }
