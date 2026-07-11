@@ -27,6 +27,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     data class WorkoutUi(
         val title: String, val start: Long, val end: Long,
         val avgHr: Int?, val maxHr: Int?, val spark: List<Double>,
+        val lightMin: Int = 0, val modMin: Int = 0, val vigMin: Int = 0,
     )
 
     data class Ui(
@@ -121,11 +122,20 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                             java.time.Instant.ofEpochMilli(wk.start),
                             java.time.Instant.ofEpochMilli(wk.end),
                         ).map { it.first }
+                        var l = 0; var m = 0; var v = 0
+                        hr.forEach { bpm ->
+                            when {
+                                bpm >= Profile.zoneVigorous -> v++
+                                bpm >= Profile.zoneModerate -> m++
+                                bpm >= Profile.zoneLight -> l++
+                            }
+                        }
                         WorkoutUi(
                             title = wk.title, start = wk.start, end = wk.end,
                             avgHr = hr.takeIf { it.isNotEmpty() }?.average()?.toInt(),
                             maxHr = hr.maxOrNull()?.toInt(),
                             spark = hr.map { it.toDouble() },
+                            lightMin = l, modMin = m, vigMin = v,
                         )
                     }
                 }.getOrDefault(emptyList())

@@ -19,9 +19,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Peer group for published population norms. Adjust here when needed. */
+/** User profile — drives peer ranges and HR zone thresholds. */
+object Profile {
+    val birth: java.time.LocalDate = java.time.LocalDate.of(1981, 4, 23)
+    val age: Int get() = java.time.Period.between(birth, java.time.LocalDate.now()).years
+    /** Tanaka max HR: 208 − 0.7 × age. */
+    val maxHr: Int get() = (208 - 0.7 * age).toInt()
+    val zoneLight: Int get() = (maxHr * 0.50).toInt()      // 50% max
+    val zoneModerate: Int get() = (maxHr * 0.64).toInt()   // CDC moderate 64–76%
+    val zoneVigorous: Int get() = (maxHr * 0.77).toInt()   // CDC vigorous 77%+
+}
+
 object Peer {
-    const val LABEL = "MEN 40–59"
+    val LABEL: String get() = "MEN ${Profile.age / 10 * 10}–${Profile.age / 10 * 10 + 9}"
 }
 
 data class RangeSpec(
