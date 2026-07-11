@@ -18,7 +18,9 @@ import java.time.ZoneId
 @Composable
 fun PressureBandChart(readings: List<BpReading>) {
     if (readings.size < 2) return
-    val days = readings.sortedBy { it.epochMillis }.takeLast(21)
+    val cutoff = System.currentTimeMillis() - 90L * 86_400_000L
+    val days = readings.filter { it.epochMillis >= cutoff }.sortedBy { it.epochMillis }
+        .ifEmpty { readings.sortedBy { it.epochMillis }.takeLast(21) }
     val anim by animateFloatAsState(1f, tween(900), label = "bands")
     // capture as state so recompositions don't restart; simple appearance
     val appeared = remember { Animatable(0f) }
@@ -26,11 +28,15 @@ fun PressureBandChart(readings: List<BpReading>) {
 
     Canvas(Modifier.fillMaxWidth().height(180.dp)) {
         val w = size.width; val h = size.height
-        val padL = 64f; val padB = 22f; val padT = 8f
+        val padL = 64f; val padB = 30f; val padT = 8f
         val lo = 55f; val hi = 155f
         fun y(v: Float) = padT + (h - padB - padT) * (1f - (v - lo) / (hi - lo))
         val plotW = w - padL - 10f
-        val bw = plotW / days.size
+        // TIME-scaled x-axis: position each reading by its actual date
+        val tMin = days.first().epochMillis
+        val tMax = days.last().epochMillis.coerceAtLeast(tMin + 1)
+        fun tx(t: Long) = padL + plotW * (t - tMin).toFloat() / (tMax - tMin).toFloat()
+        val bw = (plotW / days.size).coerceAtMost(34f)
 
         // AHA zones
         drawRect(androidx.compose.ui.graphics.Color(0x14F5A623), Offset(padL, y(130f)), Size(plotW, y(120f) - y(130f)))
@@ -45,7 +51,7 @@ fun PressureBandChart(readings: List<BpReading>) {
         }
 
         days.forEachIndexed { i, r ->
-            val x = padL + i * bw + bw / 2
+            val x = tx(r.epochMillis).coerceIn(padL + bw / 2, w - 10f - bw / 2)
             val sysY = y(r.systolic.toFloat())
             val diaY = y(r.diastolic.toFloat())
             val mapY = y((r.diastolic + (r.systolic - r.diastolic) / 3f))
@@ -62,5 +68,15 @@ fun PressureBandChart(readings: List<BpReading>) {
                 drawCircle(PL.Txt, 2.2f, Offset(x, mapY))
             }
         }
+        // date labels: start · mid · end
+        val fmt = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
+        val paint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#5B6D8A"); textSize = 24f
+        }
+        drawContext.canvas.nativeCanvas.drawText(fmt.format(tMin), padL, h - 2f, paint)
+        val midLabel = fmt.format((tMin + tMax) / 2)
+        drawContext.canvas.nativeCanvas.drawText(midLabel, padL + plotW / 2 - midLabel.length * 6f, h - 2f, paint)
+        val endLabel = fmt.format(tMax)
+        drawContext.canvas.nativeCanvas.drawText(endLabel, w - 10f - endLabel.length * 12f, h - 2f, paint)
     }
 }
