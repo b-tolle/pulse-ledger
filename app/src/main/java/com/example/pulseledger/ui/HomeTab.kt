@@ -60,25 +60,29 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int)
 
         // Two-column metric grid
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricCard("Heart Rate", (ui.latestHr ?: ui.restingHr)?.toString(), "bpm", PL.Sys,
                     sub = if (ui.latestHr != null) "live · tap for detail" else "resting today",
-                    onClick = { onNavigate(2) }, modifier = Modifier.weight(1f))
+                    onClick = { onNavigate(2) }, modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    if (ui.hrToday.size >= 2)
+                        AreaSpark(ui.hrToday.map { it.first.toDouble() }.takeLast(120), PL.Sys, 40)
+                }
                 MetricCard("Steps", ui.stepsToday?.let { "%,d".format(it) }, "", PL.Charge,
-                    sub = ui.steps7dAvg?.let { "avg %,d".format(it) } ?: "", modifier = Modifier.weight(1f), onClick = { onNavigate(4) }) {
+                    sub = ui.steps7dAvg?.let { "avg %,d".format(it) } ?: "", modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onNavigate(4) }) {
                     WeekBars(stepWeek, PL.Charge)
                 }
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 val loc = ui.currentPlace
                 MetricCard("Location", loc, "", when (loc) {
                     "Home" -> PL.Charge; "Work" -> PL.Dia; else -> PL.Gold
-                }, sub = if (loc == null) "grant location" else "right now", modifier = Modifier.weight(1f), onClick = { onNavigate(4) })
+                }, sub = if (loc == null) "grant location" else "right now", modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onNavigate(4) })
                 MetricCard("Blood Pressure",
                     ui.readings.firstOrNull()?.let { "${it.systolic}/${it.diastolic}" }, "",
-                    PL.Dia, sub = "latest reading", modifier = Modifier.weight(1f), onClick = { onNavigate(4) })
+                    ui.readings.firstOrNull()?.let { bpSeverityColor(it.systolic, it.diastolic) } ?: PL.Dia,
+                    sub = "latest reading", modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onNavigate(1) })
             }
         }
     }

@@ -1,82 +1,103 @@
 package com.example.pulseledger.ui
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
 import com.example.pulseledger.data.db.BpReading
 import java.time.Instant
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
+/**
+ * Time-scaled BP bands. X axis is real calendar time (gaps show as gaps).
+ * Dashed stage thresholds for BOTH numbers — systolic S1/S2 at 130/140,
+ * diastolic S1/S2 at 80/90 — so each dot is judged against its own line.
+ * Dot colors use the same graded severity scale as the reading list.
+ */
 @Composable
 fun PressureBandChart(readings: List<BpReading>) {
     if (readings.size < 2) return
-    val cutoff = System.currentTimeMillis() - 90L * 86_400_000L
-    val days = readings.filter { it.epochMillis >= cutoff }.sortedBy { it.epochMillis }
-        .ifEmpty { readings.sortedBy { it.epochMillis }.takeLast(21) }
-    val anim by animateFloatAsState(1f, tween(900), label = "bands")
-    // capture as state so recompositions don't restart; simple appearance
+    val pts = readings.sortedBy { it.epochMillis }.takeLast(40)
+    val t0 = pts.first().epochMillis
+    val t1 = pts.last().epochMillis.coerceAtLeast(t0 + 1)
     val appeared = remember { Animatable(0f) }
-    LaunchedEffect(days.size) { appeared.snapTo(0f); appeared.animateTo(1f, tween(700)) }
+    LaunchedEffect(pts.size) { appeared.snapTo(0f); appeared.animateTo(1f, tween(700)) }
 
-    Canvas(Modifier.fillMaxWidth().height(180.dp)) {
+    Canvas(Modifier.fillMaxWidth().height(210.dp)) {
+        val padL = 58f; val padR = 96f; val padB = 30f; val padT = 8f
+        val lo = 55f; val hi = 165f
         val w = size.width; val h = size.height
-        val padL = 64f; val padB = 30f; val padT = 8f
-        val lo = 55f; val hi = 155f
         fun y(v: Float) = padT + (h - padB - padT) * (1f - (v - lo) / (hi - lo))
-        val plotW = w - padL - 10f
-        // TIME-scaled x-axis: position each reading by its actual date
-        val tMin = days.first().epochMillis
-        val tMax = days.last().epochMillis.coerceAtLeast(tMin + 1)
-        fun tx(t: Long) = padL + plotW * (t - tMin).toFloat() / (tMax - tMin).toFloat()
-        val bw = (plotW / days.size).coerceAtMost(34f)
+        fun x(t: Long) = padL + (w - padL - padR) * (t - t0).toFloat() / (t1 - t0).toFloat()
 
-        // AHA zones
-        drawRect(androidx.compose.ui.graphics.Color(0x14F5A623), Offset(padL, y(130f)), Size(plotW, y(120f) - y(130f)))
-        drawRect(androidx.compose.ui.graphics.Color(0x14FF5D73), Offset(padL, y(155f)), Size(plotW, y(130f) - y(155f)))
-
-        // gridlines + labels
-        listOf(60, 80, 100, 120, 140).forEach { g ->
-            val gy = y(g.toFloat())
-            drawLine(PL.Line, Offset(padL, gy), Offset(w - 10f, gy), 1.2f)
-            drawContext.canvas.nativeCanvas.drawText("$g", 12f, gy + 8f,
-                android.graphics.Paint().apply { color = android.graphics.Color.parseColor("#5B6D8A"); textSize = 24f })
+        val axis = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#5B6D8A"); textSize = 24f
         }
 
-        days.forEachIndexed { i, r ->
-            val x = tx(r.epochMillis).coerceIn(padL + bw / 2, w - 10f - bw / 2)
-            val sysY = y(r.systolic.toFloat())
-            val diaY = y(r.diastolic.toFloat())
-            val mapY = y((r.diastolic + (r.systolic - r.diastolic) / 3f))
-            val grow = (appeared.value * days.size - i).coerceIn(0f, 1f)
+        // baseline gridlines
+        listOf(60, 100, 120, 160).forEach { g ->
+            val gy = y(g.toFloat())
+            drawLine(PL.Line, Offset(padL, gy), Offset(w - padR, gy), 1f)
+            drawContext.canvas.nativeCanvas.drawText("$g", 10f, gy + 8f, axis)
+        }
+
+        // stage thresholds for both numbers, dashed, labeled at right
+        val dash = PathEffect.dashPathEffect(floatArrayOf(12f, 10f))
+        val orange = Color(0xFFFF8A5D); val red = Color(0xFFFF5D73)
+        data class Thr(val v: Int, val label: String, val c: Color)
+        listOf(
+            Thr(140, "SYS·S2", red), Thr(130, "SYS·S1", orange),
+            Thr(90, "DIA·S2", red), Thr(80, "DIA·S1", orange),
+        ).forEach { t ->
+            val ty = y(t.v.toFloat())
+            drawLine(t.c.copy(alpha = 0.75f), Offset(padL, ty), Offset(w - padR, ty),
+                strokeWidth = 2f, pathEffect = dash)
+            drawContext.canvas.nativeCanvas.drawText(
+                "${t.label} ${t.v}", w - padR + 8f, ty + 8f,
+                android.graphics.Paint().apply {
+                    color = android.graphics.Color.argb(230,
+                        (t.c.red * 255).toInt(), (t.c.green * 255).toInt(), (t.c.blue * 255).toInt())
+                    textSize = 22f
+                })
+        }
+
+        // bands + severity dots, positioned on real time
+        val bw = ((w - padL - padR) / pts.size * 0.45f).coerceIn(6f, 14f)
+        pts.forEachIndexed { i, r ->
+            val grow = (appeared.value * pts.size - i).coerceIn(0f, 1f)
+            if (grow <= 0f) return@forEachIndexed
+            val cx = x(r.epochMillis)
+            val sysY = y(r.systolic.toFloat()); val diaY = y(r.diastolic.toFloat())
             val midY = (sysY + diaY) / 2
             val topY = midY + (sysY - midY) * grow
             val botY = midY + (diaY - midY) * grow
-
-            drawLine(androidx.compose.ui.graphics.Color(0xFF2A3A57),
-                Offset(x, topY), Offset(x, botY), strokeWidth = bw * 0.42f, cap = StrokeCap.Round)
+            drawLine(Color(0xFF2A3A57), Offset(cx, topY), Offset(cx, botY),
+                strokeWidth = bw, cap = StrokeCap.Round)
             if (grow > 0.9f) {
-                drawCircle(PL.Sys, bw * 0.22f, Offset(x, sysY))
-                drawCircle(PL.Dia, bw * 0.22f, Offset(x, diaY))
-                drawCircle(PL.Txt, 2.2f, Offset(x, mapY))
+                val sev = bpSeverityColor(r.systolic, r.diastolic)
+                drawCircle(sev, bw * 0.55f, Offset(cx, sysY))
+                drawCircle(sev, bw * 0.55f, Offset(cx, diaY))
+                val mapY = y(r.diastolic + (r.systolic - r.diastolic) / 3f)
+                drawCircle(PL.Txt, 2.2f, Offset(cx, mapY))
             }
         }
-        // date labels: start · mid · end
-        val fmt = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
-        val paint = android.graphics.Paint().apply {
-            color = android.graphics.Color.parseColor("#5B6D8A"); textSize = 24f
-        }
-        drawContext.canvas.nativeCanvas.drawText(fmt.format(tMin), padL, h - 2f, paint)
-        val midLabel = fmt.format((tMin + tMax) / 2)
-        drawContext.canvas.nativeCanvas.drawText(midLabel, padL + plotW / 2 - midLabel.length * 6f, h - 2f, paint)
-        val endLabel = fmt.format(tMax)
-        drawContext.canvas.nativeCanvas.drawText(endLabel, w - 10f - endLabel.length * 12f, h - 2f, paint)
+
+        // real date labels: first / middle / last
+        val fmt = DateTimeFormatter.ofPattern("MMM d").withZone(ZoneId.systemDefault())
+        drawContext.canvas.nativeCanvas.drawText(fmt.format(Instant.ofEpochMilli(t0)), padL, h - 4f, axis)
+        val mid = fmt.format(Instant.ofEpochMilli((t0 + t1) / 2))
+        drawContext.canvas.nativeCanvas.drawText(mid, (padL + w - padR) / 2 - mid.length * 6f, h - 4f, axis)
+        val last = fmt.format(Instant.ofEpochMilli(t1))
+        drawContext.canvas.nativeCanvas.drawText(last, w - padR - last.length * 12f, h - 4f, axis)
     }
 }

@@ -107,8 +107,10 @@ class HealthConnectManager(private val context: Context) {
         )
         for (bucket in response) {
             val steps = bucket.result[StepsRecord.COUNT_TOTAL] ?: continue
-            val dayMs = bucket.startTime.atZone(zone).toInstant().toEpochMilli()
-            out[dayMs - dayMs % 86_400_000L] = steps
+            // Key by LOCAL midnight (UTC flooring shifted "today" after 7 PM CDT)
+            val dayKey = bucket.startTime.atZone(zone).toLocalDate()
+                .atStartOfDay(zone).toInstant().toEpochMilli()
+            out[dayKey] = steps
         }
         return out
     }

@@ -226,6 +226,8 @@ private fun LatestBpCard(ui: DashboardViewModel.Ui) {
             Spacer(Modifier.height(6.dp))
             Text("MAP ${Calculations.meanArterialPressure(latest.systolic, latest.diastolic)}  ·  PP ${latest.systolic - latest.diastolic}  ·  ${fmtTime(latest.epochMillis)}",
                 color = PL.Soft, fontSize = 12.sp)
+            Text("MAP = mean arterial pressure (organ perfusion, want ≥65) · PP = pulse pressure, sys−dia (30–50 typical)",
+                color = PL.Dim, fontSize = 10.sp, lineHeight = 14.sp)
         }
     }
 }

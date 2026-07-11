@@ -77,11 +77,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     .distinctBy { it.epochMillis / 60000 }   // dedupe to the minute
                     .sortedByDescending { it.epochMillis }
 
-                val dayMs = 86_400_000L
-                val todayStart = now.toEpochMilli() - now.toEpochMilli() % dayMs
+                val zoneId = java.time.ZoneId.systemDefault()
+                val todayLocal = java.time.LocalDate.now(zoneId)
+                val todayStart = todayLocal.atStartOfDay(zoneId).toInstant().toEpochMilli()
                 val byDay = hc.dailySteps(from, now)
                 val today = byDay[todayStart]
-                val last7 = byDay.filterKeys { it in (todayStart - 7 * dayMs) until todayStart }.values
+                val last7 = (1..7).mapNotNull {
+                    byDay[todayLocal.minusDays(it.toLong()).atStartOfDay(zoneId).toInstant().toEpochMilli()]
+                }
                 val avg7 = if (last7.isEmpty()) null else last7.sum() / last7.size
 
                 val rhr = hc.readRestingHeartRate(from, now)
