@@ -359,3 +359,43 @@ private fun LatestBpCard(ui: DashboardViewModel.Ui) {
 
 private fun fmtTime(epoch: Long): String =
     DateTimeFormatter.ofPattern("MMM d · h:mm a").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(epoch))
+
+/** Before/after view of BP since starting olmesartan 20mg on May 22, 2026. */
+@Composable
+private fun MedEffectCard(readings: List<BpReading>) {
+    // May 22, 2026 00:00 UTC
+    val medStart = 1_779_408_000_000L
+    val after = readings.filter { it.epochMillis >= medStart }
+    if (after.size < 6) return
+    val sorted = after.sortedBy { it.epochMillis }
+    val firstWin = sorted.take(sorted.size / 3).ifEmpty { return }
+    val lastWin = sorted.takeLast(sorted.size / 3).ifEmpty { return }
+    fun avg(l: List<BpReading>, f: (BpReading) -> Int) = l.map(f).average().toInt()
+    val fs = avg(firstWin) { it.systolic }; val fd = avg(firstWin) { it.diastolic }
+    val ls = avg(lastWin) { it.systolic }; val ld = avg(lastWin) { it.diastolic }
+    Card {
+        SectionLabel("SINCE STARTING OLMESARTAN · MAY 22")
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("First weeks", color = PL.Soft, fontSize = 12.sp)
+                Text("$fs/$fd", color = bpSeverityColor(fs, fd), fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+            Text("→", color = PL.Dim, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Recent", color = PL.Soft, fontSize = 12.sp)
+                Text("$ls/$ld", color = bpSeverityColor(ls, ld), fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("Δ", color = PL.Dim, fontSize = 12.sp)
+                Text("${ls - fs}/${ld - fd}", color = if (ls < fs) PL.Charge else PL.Drain,
+                    fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("Informational, not medical advice — but a useful picture to bring to your prescriber.",
+            color = PL.Dim, fontSize = 10.5.sp)
+    }
+}
