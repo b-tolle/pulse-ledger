@@ -71,6 +71,16 @@ fun ActivityTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                             Text("Vigorous ${wk.vigMin}m", color = PL.Sys, fontSize = 11.5.sp)
                         }
                     }
+                    if (wk.lightMin + wk.modMin + wk.vigMin > 0) {
+                        Spacer(Modifier.height(8.dp))
+                        Row {
+                            Text("Light ${wk.lightMin}m", color = androidx.compose.ui.graphics.Color(0xFF2BB3A3),
+                                fontSize = 11.5.sp, modifier = Modifier.padding(end = 12.dp))
+                            Text("Moderate ${wk.modMin}m", color = PL.Drain,
+                                fontSize = 11.5.sp, modifier = Modifier.padding(end = 12.dp))
+                            Text("Vigorous ${wk.vigMin}m", color = PL.Sys, fontSize = 11.5.sp)
+                        }
+                    }
                     if (wk.spark.size >= 2) {
                         Spacer(Modifier.height(10.dp))
                         AreaSpark(wk.spark, PL.Sys, 48)
