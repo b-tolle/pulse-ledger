@@ -76,17 +76,14 @@ fun IntradayHrChart(samples: List<Pair<Long, Long>>, heightDp: Int = 170) {
     }
 }
 
-/** Sleep-stage hypnogram: Awake / REM / Light / Deep rows with rounded spans. */
+/** Sleep-stage hypnogram, pro-style: connected corners are SQUARE so stems
+ *  grow flush out of flat block faces (one continuous shape per transition);
+ *  free corners stay rounded. Stems gradient from stage color to stage color. */
 @Composable
 fun Hypnogram(night: HealthConnectManager.SleepNight, heightDp: Int = 150) {
     if (night.stages.isEmpty()) return
-    // row index per stage type (top→bottom): Awake, REM, Light, Deep
     fun row(type: Int): Int? = when (type) {
-        1, 3, 7 -> 0          // awake / out of bed / awake-in-bed
-        6 -> 1                // REM
-        2, 4, 0 -> 2          // light / generic sleeping / unknown
-        5 -> 3                // deep
-        else -> 2
+        1, 3, 7 -> 0; 6 -> 1; 2, 4, 0 -> 2; 5 -> 3; else -> 2
     }
     val rowColor = listOf(PL.Drain, PL.Sleep, Color(0xFF2BB3A3), PL.Dia)
     val labels = listOf("Awake", "REM", "Light", "Deep")
@@ -96,54 +93,66 @@ fun Hypnogram(night: HealthConnectManager.SleepNight, heightDp: Int = 150) {
         val w = size.width; val h = size.height
         val rowH = (h - padB - padT) / 4f
         fun x(t: Long) = padL + (w - padL - 8f) * (t - night.start).toFloat() / (night.end - night.start).toFloat()
-
-        labels.forEachIndexed { i, lab ->
-            drawContext.canvas.nativeCanvas.drawText(lab, 8f, padT + rowH * i + rowH / 2 + 8f, axisPaint())
-        }
-        // Connectors run EDGE to EDGE — from the face of the block being left
-        // to the face of the block being entered — with round caps, so they
-        // pour into the pills instead of spearing through them.
         fun blockTop(r: Int) = padT + rowH * r + rowH * 0.20f
         fun blockBot(r: Int) = blockTop(r) + rowH * 0.60f
-        var prevSpan: HealthConnectManager.StageSpan? = null
-        night.stages.forEach { sp ->
-            val r = row(sp.type) ?: return@forEach
-            prevSpan?.let { pv ->
-                val pr = row(pv.type)
-                if (pr != null && pr != r) {
-                    val cxLine = x(sp.start)
-                    val movingDown = r > pr
-                    val yFrom = if (movingDown) blockBot(pr) - 4f else blockTop(pr) + 4f
-                    val yTo = if (movingDown) blockTop(r) + 4f else blockBot(r) - 4f
-                    val topColor = if (yFrom < yTo) rowColor[pr] else rowColor[r]
-                    val botColor = if (yFrom < yTo) rowColor[r] else rowColor[pr]
-                    drawLine(
-                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                            colors = listOf(topColor.copy(alpha = 0.85f), botColor.copy(alpha = 0.85f)),
-                            startY = minOf(yFrom, yTo), endY = maxOf(yFrom, yTo),
-                        ),
-                        start = Offset(cxLine, yFrom), end = Offset(cxLine, yTo),
-                        strokeWidth = 5f,
-                        cap = StrokeCap.Round,
-                    )
-                }
-            }
-            prevSpan = sp
+
+        val axisPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#5B6D8A"); textSize = 24f
         }
-        night.stages.forEach { sp ->
-            val r = row(sp.type) ?: return@forEach
-            val x0 = x(sp.start); val x1 = x(sp.end)
-            drawRoundRect(
-                color = rowColor[r],
-                topLeft = Offset(x0, padT + rowH * r + rowH * 0.20f),
-                size = Size((x1 - x0).coerceAtLeast(8f), rowH * 0.60f),
-                cornerRadius = CornerRadius(12f, 12f),
+        labels.forEachIndexed { i, lab ->
+            drawContext.canvas.nativeCanvas.drawText(lab, 8f, padT + rowH * i + rowH / 2 + 8f, axisPaint)
+        }
+
+        // Resolve spans -> renderable blocks with connection flags
+        data class Blk(val r: Int, val x0: Float, val x1: Float, val cS: Boolean, val cE: Boolean)
+        val spans = night.stages.mapNotNull { sp -> row(sp.type)?.let { Triple(it, sp.start, sp.end) } }
+        val blks = spans.mapIndexed { i, (r, st, en) ->
+            val cS = i > 0 && spans[i - 1].first != r
+            val cE = i < spans.lastIndex && spans[i + 1].first != r
+            Blk(r, x(st), maxOf(x(en), x(st) + 8f), cS, cE)
+        }
+
+        // Stems first: flat face of block A -> flat face of block B, 2px tucked in
+        for (i in 1 until spans.size) {
+            val r = spans[i].first; val pr = spans[i - 1].first
+            if (pr == r) continue
+            val cx = x(spans[i].second)
+            val down = r > pr
+            val yFrom = if (down) blockBot(pr) - 2f else blockTop(pr) + 2f
+            val yTo = if (down) blockTop(r) + 2f else blockBot(r) - 2f
+            val yMin = minOf(yFrom, yTo); val yMax = maxOf(yFrom, yTo)
+            val topC = if (yFrom < yTo) rowColor[pr] else rowColor[r]
+            val botC = if (yFrom < yTo) rowColor[r] else rowColor[pr]
+            drawLine(
+                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(topC, botC), startY = yMin, endY = yMax),
+                start = Offset(cx, yFrom), end = Offset(cx, yTo),
+                strokeWidth = 5f,
             )
         }
-        // start/end labels
+
+        // Blocks on top: square corners where connected, rounded where free
+        val rad = CornerRadius(12f, 12f)
+        val none = CornerRadius.Zero
+        blks.forEach { b ->
+            val top = blockTop(b.r); val bot = blockBot(b.r)
+            val path = Path().apply {
+                addRoundRect(
+                    androidx.compose.ui.geometry.RoundRect(
+                        b.x0, top, b.x1, bot,
+                        topLeftCornerRadius = if (b.cS) none else rad,
+                        topRightCornerRadius = if (b.cE) none else rad,
+                        bottomRightCornerRadius = if (b.cE) none else rad,
+                        bottomLeftCornerRadius = if (b.cS) none else rad,
+                    )
+                )
+            }
+            drawPath(path, rowColor[b.r])
+        }
+
         val fmt = java.text.SimpleDateFormat("h:mm a", java.util.Locale.US)
-        drawContext.canvas.nativeCanvas.drawText(fmt.format(night.start), padL, h - 4f, axisPaint())
+        drawContext.canvas.nativeCanvas.drawText(fmt.format(night.start), padL, h - 4f, axisPaint)
         val endLabel = fmt.format(night.end)
-        drawContext.canvas.nativeCanvas.drawText(endLabel, w - 8f - endLabel.length * 12f, h - 4f, axisPaint())
+        drawContext.canvas.nativeCanvas.drawText(endLabel, w - 8f - endLabel.length * 12f, h - 4f, axisPaint)
     }
 }
