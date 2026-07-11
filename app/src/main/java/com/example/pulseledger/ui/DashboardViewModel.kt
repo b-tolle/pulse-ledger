@@ -144,10 +144,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addManual(sys: Int, dia: Int, pulse: Int?) {
         viewModelScope.launch {
+            val nowMs = System.currentTimeMillis()
             Db.get(getApplication()).dao().upsertReadings(listOf(
-                BpReading(System.currentTimeMillis(), sys, dia, pulse, "manual")
+                BpReading(nowMs, sys, dia, pulse, "manual")
             ))
-            _ui.value = _ui.value.copy(notice = "Saved $sys/$dia")
+            val wrote = runCatching {
+                HealthConnectManager(getApplication()).writeBloodPressure(listOf(Triple(nowMs, sys, dia)))
+            }.getOrDefault(0)
+            _ui.value = _ui.value.copy(notice = "Saved $sys/$dia" + if (wrote > 0) " · shared to Health Connect" else "")
             load()
         }
     }
@@ -213,7 +217,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             if (res.readings.isEmpty()) "No BP readings found in one file"
             else {
                 Db.get(getApplication()).dao().upsertReadings(res.readings)
-                "✓ ${res.readings.size} BP readings" + if (res.skipped > 0) " (${res.skipped} skipped)" else ""
+                val wrote = runCatching {
+                    HealthConnectManager(getApplication())
+                        .writeBloodPressure(res.readings.map { Triple(it.epochMillis, it.systolic, it.diastolic) })
+                }.getOrDefault(0)
+                "✓ ${res.readings.size} BP readings" +
+                    (if (wrote > 0) " · $wrote shared to Health Connect" else "") +
+                    (if (res.skipped > 0) " (${res.skipped} skipped)" else "")
             }
         } catch (t: Throwable) {
             "Import failed: ${t.message}"

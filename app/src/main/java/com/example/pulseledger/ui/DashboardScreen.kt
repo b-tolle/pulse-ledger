@@ -110,6 +110,7 @@ private fun PressureContent(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                 PressureBandChart(ui.readings)
             }
         }
+        item { MedEffectCard(ui) }
         if (ui.readings.isNotEmpty()) {
             item {
                 Card {
@@ -199,6 +200,43 @@ private fun HistoryContent(ui: DashboardViewModel.Ui) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MedEffectCard(ui: DashboardViewModel.Ui) {
+    // BP meds started May 22, 2026 (edit MED_START to adjust)
+    val MED_START = java.time.LocalDate.of(2026, 5, 22)
+        .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val before = ui.readings.filter { it.epochMillis < MED_START }
+    val after = ui.readings.filter { it.epochMillis >= MED_START }
+    if (before.size < 3 || after.size < 3) return
+    fun avg(l: List<BpReading>, f: (BpReading) -> Int) = l.map(f).average().toInt()
+    val bS = avg(before) { it.systolic }; val bD = avg(before) { it.diastolic }
+    val aS = avg(after) { it.systolic }; val aD = avg(after) { it.diastolic }
+    Card {
+        SectionLabel("SINCE STARTING BP MEDS · MAY 22")
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Before (n=${before.size})", color = PL.Soft, fontSize = 12.sp)
+                Text("$bS/$bD", color = bpSeverityColor(bS, bD), fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+            Text("→", color = PL.Dim, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Since (n=${after.size})", color = PL.Soft, fontSize = 12.sp)
+                Text("$aS/$aD", color = bpSeverityColor(aS, aD), fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        val dS = aS - bS; val dD = aD - bD
+        Text(
+            "Change: ${if (dS <= 0) "" else "+"}$dS systolic, ${if (dD <= 0) "" else "+"}$dD diastolic. " +
+            "Numbers to bring to your prescriber — the app never advises dose changes.",
+            color = PL.Dim, fontSize = 11.5.sp, lineHeight = 16.sp,
+        )
     }
 }
 

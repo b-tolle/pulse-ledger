@@ -25,6 +25,7 @@ class HealthConnectManager(private val context: Context) {
 
     val permissions = setOf(
         HealthPermission.getReadPermission(BloodPressureRecord::class),
+        HealthPermission.getWritePermission(BloodPressureRecord::class),
         HealthPermission.getReadPermission(HeartRateRecord::class),
         HealthPermission.getReadPermission(RestingHeartRateRecord::class),
         HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
@@ -141,6 +142,25 @@ class HealthConnectManager(private val context: Context) {
             StageSpan(it.stage, it.startTime.toEpochMilli(), it.endTime.toEpochMilli())
         }.sortedBy { it.start }
         return SleepNight(latest.startTime.toEpochMilli(), latest.endTime.toEpochMilli(), stages)
+    }
+
+
+    /** Writes BP readings into Health Connect so every app (Google Health, etc.) can see them. */
+    suspend fun writeBloodPressure(readings: List<Triple<Long, Int, Int>>): Int {
+        if (readings.isEmpty()) return 0
+        val records = readings.map { (epochMs, sys, dia) ->
+            BloodPressureRecord(
+                time = Instant.ofEpochMilli(epochMs),
+                zoneOffset = java.time.ZoneId.systemDefault().rules.getOffset(Instant.ofEpochMilli(epochMs)),
+                systolic = androidx.health.connect.client.units.Pressure.millimetersOfMercury(sys.toDouble()),
+                diastolic = androidx.health.connect.client.units.Pressure.millimetersOfMercury(dia.toDouble()),
+                bodyPosition = BloodPressureRecord.BODY_POSITION_UNKNOWN,
+                measurementLocation = BloodPressureRecord.MEASUREMENT_LOCATION_UNKNOWN,
+                metadata = androidx.health.connect.client.records.metadata.Metadata.manualEntry(),
+            )
+        }
+        client.insertRecords(records)
+        return records.size
     }
 
     private suspend fun <T : Record> readAll(
