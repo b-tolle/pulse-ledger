@@ -25,6 +25,9 @@
     <!-- Together detection (bond phones once; see life/TogetherDetector.kt) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
 
     <!-- Places / geofences -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -55,6 +58,11 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"/>
         </provider>
+
+        <service
+            android:name=".life.TogetherService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice"/>
 
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

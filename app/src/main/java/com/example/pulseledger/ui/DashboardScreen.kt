@@ -196,7 +196,7 @@ private fun PressureTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
 private fun HistoryContent(ui: DashboardViewModel.Ui) {
     var range by remember { mutableStateOf(Range.ALL) }
     var selectedDay by remember { mutableStateOf<DailySummary?>(null) }
-    val insights = remember(ui.summaries, ui.locationDays) { mineInsights(ui.summaries, ui.locationDays) }
+    val insights = remember(ui.summaries, ui.locationDays, ui.togetherByDay) { mineInsights(ui.summaries, ui.locationDays, ui.togetherByDay) }
     selectedDay?.let { d -> DayDetailSheet(d, location = ui.locationDays[d.dayEpoch], onDismiss = { selectedDay = null }) }
     val now = System.currentTimeMillis()
     val scoped = remember(ui.summaries, range) {

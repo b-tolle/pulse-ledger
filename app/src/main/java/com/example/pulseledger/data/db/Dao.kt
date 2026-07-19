@@ -24,6 +24,14 @@ interface HealthDao {
 
     @Query("SELECT * FROM hunger_logs ORDER BY dayEpoch DESC LIMIT 30")
     suspend fun recentHunger(): List<HungerLog>
+
+    @Upsert suspend fun upsertTogether(day: TogetherDay)
+
+    @Query("SELECT * FROM together_log WHERE dayEpoch = :day")
+    suspend fun togetherFor(day: Long): TogetherDay?
+
+    @Query("SELECT * FROM together_log ORDER BY dayEpoch DESC LIMIT 120")
+    suspend fun recentTogether(): List<TogetherDay>
     @Upsert suspend fun upsertSummaries(summaries: List<DailySummary>)
 
     @Query("SELECT * FROM bp_readings ORDER BY epochMillis DESC LIMIT :limit")
@@ -73,8 +81,9 @@ interface HealthDao {
         WeightEntry::class,
         MedShot::class,
         HungerLog::class,
+        TogetherDay::class,
     ],
-    version = 6,
+    version = 7,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): HealthDao

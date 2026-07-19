@@ -11,7 +11,7 @@ import kotlin.math.sqrt
 data class Insight(val emoji: String, val title: String, val body: String, val accent: Long = 0xFF8CA0BE)
 
 /** Real findings mined from the imported archive — not just charts. */
-fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = emptyMap()): List<Insight> {
+fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = emptyMap(), togetherByDay: Map<Long, Int> = emptyMap()): List<Insight> {
     val out = ArrayList<Insight>()
     val zone = ZoneId.systemDefault()
     val fmt = DateTimeFormatter.ofPattern("MMMM d, yyyy").withZone(zone)
@@ -99,6 +99,22 @@ fun mineInsights(s: List<DailySummary>, locationDays: Map<Long, LocationDay> = e
             if (wStress.size >= 5 && oStress.size >= 5)
                 body += " Stress runs %.0f at work vs %.0f off.".format(wStress.average(), oStress.average())
             out += Insight("", "Work-day effect", body, 0xFF5B9BFF)
+        }
+    }
+
+    // Together effect: days with 1h+ together vs mostly-apart days
+    if (togetherByDay.size >= 8) {
+        val togetherDays = togetherByDay.filterValues { it >= 60 }.keys
+        val apartDays = togetherByDay.filterValues { it < 15 }.keys
+        val tg = s.filter { it.dayEpoch in togetherDays }
+        val ap = s.filter { it.dayEpoch in apartDays }
+        val tgStress = tg.mapNotNull { it.stressAvg }
+        val apStress = ap.mapNotNull { it.stressAvg }
+        if (tgStress.size >= 4 && apStress.size >= 4) {
+            val d = tgStress.average() - apStress.average()
+            if (d <= -3) out += Insight("", "Better together",
+                "Your stress averages %.0f on days with an hour+ together vs %.0f apart.".format(
+                    tgStress.average(), apStress.average()), 0xFFFF5D73)
         }
     }
 

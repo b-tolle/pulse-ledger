@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         hc = HealthConnectManager(this)
         com.example.pulseledger.ui.Profile.init(this)
+        com.example.pulseledger.life.TogetherService.sync(this)
         sharedUris = extractShared(intent)
 
         lifecycleScope.launch {

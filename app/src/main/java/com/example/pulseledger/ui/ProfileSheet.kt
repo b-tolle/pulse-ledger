@@ -22,6 +22,8 @@ fun ProfileSheet(onDismiss: () -> Unit) {
     var goal by remember { mutableStateOf(Profile.goalLbs?.let { "%.0f".format(it) } ?: "") }
     var startTab by remember { mutableStateOf(Profile.startTab) }
     var stepGoal by remember { mutableStateOf(Profile.stepGoal.toString()) }
+    var partner by remember { mutableStateOf(Profile.partnerCode ?: "") }
+    var togetherBg by remember { mutableStateOf(Profile.togetherBackground) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = PL.Card) {
         Column(
@@ -54,6 +56,15 @@ fun ProfileSheet(onDismiss: () -> Unit) {
             OutlinedTextField(stepGoal, { stepGoal = it.filter(Char::isDigit).take(5) },
                 label = { Text("Daily step goal") }, singleLine = true)
 
+            OutlinedTextField(partner, { partner = it.take(20) },
+                label = { Text("Partner code (same word on both phones)") }, singleLine = true)
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Switch(checked = togetherBg, onCheckedChange = { togetherBg = it })
+                Spacer(Modifier.width(10.dp))
+                Text("Background together tracking\n(small persistent notification, ~1% battery/day)",
+                    color = PL.Soft, fontSize = 12.sp, lineHeight = 16.sp)
+            }
+
             Text("START ON", color = PL.Soft, fontSize = 11.sp, letterSpacing = 1.5.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -78,6 +89,8 @@ fun ProfileSheet(onDismiss: () -> Unit) {
                     Profile.goalLbs = goal.toDoubleOrNull()
                     Profile.startTab = startTab
                     stepGoal.toIntOrNull()?.let { if (it in 1000..50000) Profile.stepGoal = it }
+                    Profile.partnerCode = partner.trim().ifBlank { null }
+                    Profile.togetherBackground = togetherBg
                     onDismiss()
                 },
                 modifier = Modifier.fillMaxWidth(),

@@ -58,3 +58,10 @@ data class HungerLog(
     @androidx.room.PrimaryKey val dayEpoch: Long,
     val level: Int,          // 1 (not hungry) .. 5 (very hungry)
 )
+
+
+@androidx.room.Entity(tableName = "together_log")
+data class TogetherDay(
+    @androidx.room.PrimaryKey val dayEpoch: Long,
+    val minutes: Int,
+)

@@ -12,6 +12,7 @@ import com.example.pulseledger.data.db.LocationDay
 import com.example.pulseledger.data.db.WeightEntry
 import com.example.pulseledger.data.db.MedShot
 import com.example.pulseledger.data.db.HungerLog
+import com.example.pulseledger.data.db.TogetherDay
 import com.example.pulseledger.life.CalendarReader
 import com.example.pulseledger.life.Places
 import com.example.pulseledger.life.CurrentLocation
@@ -64,6 +65,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val weights: List<WeightEntry> = emptyList(),   // oldest first
         val shots: List<MedShot> = emptyList(),         // newest first
         val hungerWeek: List<Double?> = emptyList(),    // last 7 days, oldest first
+        val togetherTodayMin: Int = 0,
+        val togetherByDay: Map<Long, Int> = emptyMap(),
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -153,6 +156,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val localWeights = dao.allWeights()
                 val shots = dao.recentShots()
                 val hungerByDay = dao.recentHunger().associate { it.dayEpoch to it.level }
+                val togetherList = dao.recentTogether()
+                val togetherByDay = togetherList.associate { it.dayEpoch to it.minutes }
+                val todayKey = java.time.LocalDate.now(zoneId2()).atStartOfDay(zoneId2()).toInstant().toEpochMilli()
+                val togetherToday = togetherByDay[todayKey] ?: 0
                 val hungerWeek = (6 downTo 0).map { back ->
                     hungerByDay[java.time.LocalDate.now(zoneId2()).minusDays(back.toLong())
                         .atStartOfDay(zoneId2()).toInstant().toEpochMilli()]?.toDouble()
@@ -202,6 +209,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     weights = weights,
                     shots = shots,
                     hungerWeek = hungerWeek,
+                    togetherTodayMin = togetherToday,
+                    togetherByDay = togetherByDay,
                 )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(loading = false, error = t.message ?: "read failed")

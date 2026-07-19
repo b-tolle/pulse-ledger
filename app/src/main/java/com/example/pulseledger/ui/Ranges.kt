@@ -54,6 +54,14 @@ object Profile {
         get() = p()?.getInt("startTab", 0) ?: 0
         set(v) { p()?.edit()?.putInt("startTab", v)?.apply(); rev.intValue++ }
 
+    var partnerCode: String?
+        get() = p()?.getString("partnerCode", null)?.takeIf { it.isNotBlank() }
+        set(v) { p()?.edit()?.putString("partnerCode", v ?: "")?.apply(); rev.intValue++ }
+
+    var togetherBackground: Boolean
+        get() = p()?.getBoolean("togetherBg", false) ?: false
+        set(v) { p()?.edit()?.putBoolean("togetherBg", v)?.apply(); rev.intValue++ }
+
     var stepGoal: Int
         get() = p()?.getInt("stepGoal", 8000) ?: 8000
         set(v) { p()?.edit()?.putInt("stepGoal", v)?.apply(); rev.intValue++ }
