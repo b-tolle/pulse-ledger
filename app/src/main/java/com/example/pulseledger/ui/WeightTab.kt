@@ -170,7 +170,7 @@ private fun BodyCard(lastLbs: Double?) {
             }
             Spacer(Modifier.height(8.dp))
             ShapeOutline(waist, h.toDouble())
-            Text("Solid = your proportions · dashed = mid-typical (waist ≈ 45% of height).",
+            Text("Figure drawn from your waist-to-height · dashed marks = mid-typical waist width · color = your BRI zone.",
                 color = PL.Dim, fontSize = 10.5.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 6.dp))
             Spacer(Modifier.height(8.dp))
             Text("What these mean: BMI is weight relative to height — simple, but blind to where weight sits; muscle and belly score the same. BRI (2024) models your torso as an ellipse from height and waist, so it tracks shape — a better signal for visceral fat and the health risks that come with it. Watching BRI fall while weight drops means the loss is coming from the middle.",
@@ -181,27 +181,74 @@ private fun BodyCard(lastLbs: Double?) {
 
 @Composable
 private fun ShapeOutline(waistIn: Double, heightIn: Double) {
-    Canvas(Modifier.fillMaxWidth().height(150.dp)) {
-        val ch = size.height - 8f
-        val cx = size.width / 2
-        // ellipse heights fixed; widths scale with waist-to-height ratio
-        fun halfWidth(ratio: Double) = (ch * 0.62f * ratio).toFloat().coerceAtMost(size.width * 0.4f)
-        val youW = halfWidth(waistIn / heightIn)
-        val typW = halfWidth(0.45)
-        // typical: dashed
-        drawOval(
-            color = Color(0xFF8CA0BE),
-            topLeft = Offset(cx - typW, 4f),
-            size = androidx.compose.ui.geometry.Size(typW * 2, ch),
-            style = Stroke(width = 2.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))),
-        )
-        // you: solid
-        drawOval(
-            color = PL.Sleep,
-            topLeft = Offset(cx - youW, 4f),
-            size = androidx.compose.ui.geometry.Size(youW * 2, ch),
-            style = Stroke(width = 4f),
-        )
+    val ratio = (waistIn / heightIn)
+    val briVal = bri(waistIn, heightIn)
+    val (zoneColor, zoneLabel) = when {
+        briVal < 3.41 -> PL.Dia to "Lean shape"
+        briVal < 5.46 -> Color(0xFF57C97B) to "Typical shape"
+        briVal < 6.91 -> PL.Drain to "Elevated roundness"
+        else -> PL.Sys to "High roundness"
+    }
+    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()) {
+        Canvas(Modifier.fillMaxWidth().height(210.dp)) {
+            val h = size.height - 10f
+            val cx = size.width / 2f
+            fun Y(f: Float) = 5f + h * f
+            // waist half-width from waist-to-height ratio (0.35→slim, 0.65→wide)
+            fun waistHalf(r: Double) = (h * (0.10f + ((r - 0.35).toFloat() / 0.30f) * 0.20f))
+                .coerceIn(h * 0.07f, h * 0.32f)
+            val W = waistHalf(ratio)
+            val female = Profile.female
+            val shoulder = h * (if (female) 0.185f else 0.215f)
+            val bust = h * 0.175f
+            val hip = if (female) maxOf(W * 1.18f, h * 0.175f) else maxOf(W * 1.04f, h * 0.15f)
+            val thigh = hip * 0.58f
+            val knee = h * 0.085f
+            val ankle = h * 0.055f
+
+            // one half-outline, mirrored
+            fun sidePath(sign: Int): Path = Path().apply {
+                moveTo(cx + sign * h * 0.055f, Y(0.175f))              // neck
+                quadraticBezierTo(cx + sign * shoulder * 1.05f, Y(0.20f),
+                    cx + sign * shoulder, Y(0.26f))                     // shoulder
+                quadraticBezierTo(cx + sign * bust * 1.08f, Y(0.33f),
+                    cx + sign * bust, Y(0.37f))                         // chest
+                quadraticBezierTo(cx + sign * W * 0.96f, Y(0.43f),
+                    cx + sign * W, Y(0.475f))                           // waist
+                quadraticBezierTo(cx + sign * hip * 1.06f, Y(0.55f),
+                    cx + sign * hip, Y(0.60f))                          // hip
+                quadraticBezierTo(cx + sign * thigh * 1.02f, Y(0.70f),
+                    cx + sign * thigh * 0.82f, Y(0.78f))                // thigh
+                quadraticBezierTo(cx + sign * knee, Y(0.86f),
+                    cx + sign * ankle, Y(0.985f))                       // calf→ankle
+            }
+            val body = Path().apply {
+                addPath(sidePath(1))
+                lineTo(cx + ankle * 0.2f, Y(0.985f))
+                addPath(sidePath(-1))
+            }
+            // fill + stroke in zone color
+            drawPath(body, zoneColor.copy(alpha = 0.16f))
+            drawPath(sidePath(1), zoneColor, style = Stroke(width = 4f))
+            drawPath(sidePath(-1), zoneColor, style = Stroke(width = 4f))
+            // head
+            drawCircle(zoneColor, radius = h * 0.075f, center = Offset(cx, Y(0.085f)),
+                style = Stroke(width = 4f))
+            drawCircle(zoneColor.copy(alpha = 0.16f), radius = h * 0.075f, center = Offset(cx, Y(0.085f)))
+
+            // typical waist markers: dashed verticals at the mid-typical width (WHtR 0.45)
+            val typicalHalf = waistHalf(0.45)
+            val dash = PathEffect.dashPathEffect(floatArrayOf(9f, 8f))
+            listOf(-1, 1).forEach { sgn ->
+                drawLine(Color(0xFF8CA0BE), 
+                    Offset(cx + sgn * typicalHalf, Y(0.41f)),
+                    Offset(cx + sgn * typicalHalf, Y(0.545f)),
+                    strokeWidth = 2.5f, pathEffect = dash)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(zoneLabel, color = zoneColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
 
