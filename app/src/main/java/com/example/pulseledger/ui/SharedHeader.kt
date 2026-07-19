@@ -43,7 +43,7 @@ fun AppHeader(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Pulse Ledger", color = PL.Txt, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Tolle Track", color = PL.Txt, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
                 Text(
                     "v${versionName(ctx)} · tap to check for updates",
                     color = PL.Dim, fontSize = 11.sp,

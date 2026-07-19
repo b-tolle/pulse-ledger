@@ -42,7 +42,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
 
     <application
-        android:label="Pulse Ledger"
+        android:label="Tolle Track"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.PulseLedger"
         android:allowBackup="false">

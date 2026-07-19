@@ -81,7 +81,7 @@ fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequest
                 !hcAvailable -> Center("Health Connect isn't available on this device.")
                 !permissionsGranted -> Column(Modifier.fillMaxSize().padding(24.dp),
                     verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Pulse Ledger reads your health data from Health Connect. Nothing leaves this phone.",
+                    Text("Tolle Track reads your health data from Health Connect. Nothing leaves this phone.",
                         color = PL.Soft, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(16.dp)); Button(onClick = onRequestPermissions) { Text("Grant access") }
                 }
@@ -407,7 +407,7 @@ private fun buildBpReport(readings: List<BpReading>): String {
     val fmt = DateTimeFormatter.ofPattern("MM/dd/yyyy h:mm a").withZone(ZoneId.systemDefault())
     val sorted = readings.sortedByDescending { it.epochMillis }
     val sb = StringBuilder()
-    sb.appendLine("BLOOD PRESSURE REPORT — Pulse Ledger")
+    sb.appendLine("BLOOD PRESSURE REPORT — Tolle Track")
     sb.appendLine("Generated ${DateTimeFormatter.ofPattern("MMMM d, yyyy").withZone(ZoneId.systemDefault()).format(Instant.now())}")
     sb.appendLine("Medication: olmesartan 20 mg daily, started May 22, 2026")
     sb.appendLine()
