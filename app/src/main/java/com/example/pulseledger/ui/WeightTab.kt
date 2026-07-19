@@ -182,7 +182,7 @@ private fun BodyCard(lastLbs: Double?) {
 
 @Composable
 private fun ShapeOutline(waistIn: Double, heightIn: Double) {
-    val ratio = (waistIn / heightIn)
+    val ratio = (waistIn / heightIn).toFloat()
     val briVal = bri(waistIn, heightIn)
     val (zoneColor, zoneLabel) = when {
         briVal < 3.41 -> PL.Dia to "Lean shape"
@@ -192,59 +192,72 @@ private fun ShapeOutline(waistIn: Double, heightIn: Double) {
     }
     Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth()) {
-        Canvas(Modifier.fillMaxWidth().height(210.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(230.dp)) {
             val h = size.height - 10f
             val cx = size.width / 2f
             fun Y(f: Float) = 5f + h * f
-            // waist half-width from waist-to-height ratio (0.35→slim, 0.65→wide)
-            fun waistHalf(r: Double) = (h * (0.10f + ((r - 0.35).toFloat() / 0.30f) * 0.20f))
-                .coerceIn(h * 0.07f, h * 0.32f)
+            // Calibrated waist half-width: lean ratios read visibly slim,
+            // high ratios push the waist out past the hips (apple shape).
+            fun waistHalf(r: Float) =
+                h * (0.052f + ((r - 0.35f) / 0.30f).coerceIn(0f, 1.3f) * 0.135f)
             val W = waistHalf(ratio)
             val female = Profile.female
-            val shoulder = h * (if (female) 0.185f else 0.215f)
-            val bust = h * 0.175f
-            val hip = if (female) maxOf(W * 1.18f, h * 0.175f) else maxOf(W * 1.04f, h * 0.15f)
-            val thigh = hip * 0.58f
-            val knee = h * 0.085f
-            val ankle = h * 0.055f
+            val shoulder = h * (if (female) 0.125f else 0.150f)
+            val bust = h * (if (female) 0.118f else 0.130f)
+            val hip = if (female) maxOf(h * 0.135f, W * 1.02f) else maxOf(h * 0.112f, W * 0.98f)
+            val bulge = maxOf(hip, W) * 1.12f
 
-            // one half-outline, mirrored
-            fun sidePath(sign: Int): Path = Path().apply {
-                moveTo(cx + sign * h * 0.055f, Y(0.175f))              // neck
-                quadraticBezierTo(cx + sign * shoulder * 1.05f, Y(0.20f),
-                    cx + sign * shoulder, Y(0.26f))                     // shoulder
-                quadraticBezierTo(cx + sign * bust * 1.08f, Y(0.33f),
-                    cx + sign * bust, Y(0.37f))                         // chest
-                quadraticBezierTo(cx + sign * W * 0.96f, Y(0.43f),
-                    cx + sign * W, Y(0.475f))                           // waist
-                quadraticBezierTo(cx + sign * hip * 1.06f, Y(0.55f),
-                    cx + sign * hip, Y(0.60f))                          // hip
-                quadraticBezierTo(cx + sign * thigh * 1.02f, Y(0.70f),
-                    cx + sign * thigh * 0.82f, Y(0.78f))                // thigh
-                quadraticBezierTo(cx + sign * knee, Y(0.86f),
-                    cx + sign * ankle, Y(0.985f))                       // calf→ankle
-            }
             val body = Path().apply {
-                addPath(sidePath(1))
-                lineTo(cx + ankle * 0.2f, Y(0.985f))
-                addPath(sidePath(-1))
+                moveTo(cx - h * 0.045f, Y(0.165f))                                   // neck L
+                quadraticBezierTo(cx - shoulder * 1.15f, Y(0.185f), cx - shoulder, Y(0.225f))
+                quadraticBezierTo(cx - bust * 1.10f, Y(0.27f), cx - bust, Y(0.315f))
+                quadraticBezierTo(cx - W * 0.90f, Y(0.385f), cx - W, Y(0.445f))      // waist L
+                quadraticBezierTo(cx - bulge, Y(0.52f), cx - hip, Y(0.575f))         // hip L
+                quadraticBezierTo(cx - hip * 0.92f, Y(0.66f), cx - hip * 0.62f, Y(0.75f))
+                quadraticBezierTo(cx - h * 0.065f, Y(0.86f), cx - h * 0.052f, Y(0.965f))
+                lineTo(cx - h * 0.020f, Y(0.965f))                                   // L foot inner
+                quadraticBezierTo(cx - h * 0.030f, Y(0.80f), cx - h * 0.012f, Y(0.645f))
+                quadraticBezierTo(cx, Y(0.618f), cx + h * 0.012f, Y(0.645f))         // crotch
+                quadraticBezierTo(cx + h * 0.030f, Y(0.80f), cx + h * 0.020f, Y(0.965f))
+                lineTo(cx + h * 0.052f, Y(0.965f))                                   // R foot outer
+                quadraticBezierTo(cx + h * 0.065f, Y(0.86f), cx + hip * 0.62f, Y(0.75f))
+                quadraticBezierTo(cx + hip * 0.92f, Y(0.66f), cx + hip, Y(0.575f))
+                quadraticBezierTo(cx + bulge, Y(0.52f), cx + W, Y(0.445f))           // waist R
+                quadraticBezierTo(cx + W * 0.90f, Y(0.385f), cx + bust, Y(0.315f))
+                quadraticBezierTo(cx + bust * 1.10f, Y(0.27f), cx + shoulder, Y(0.225f))
+                quadraticBezierTo(cx + shoulder * 1.15f, Y(0.185f), cx + h * 0.045f, Y(0.165f))
+                close()
             }
-            // fill + stroke in zone color
-            drawPath(body, zoneColor.copy(alpha = 0.16f))
-            drawPath(sidePath(1), zoneColor, style = Stroke(width = 4f))
-            drawPath(sidePath(-1), zoneColor, style = Stroke(width = 4f))
-            // head
-            drawCircle(zoneColor, radius = h * 0.075f, center = Offset(cx, Y(0.085f)),
-                style = Stroke(width = 4f))
-            drawCircle(zoneColor.copy(alpha = 0.16f), radius = h * 0.075f, center = Offset(cx, Y(0.085f)))
+            drawPath(body, zoneColor.copy(alpha = 0.20f))
+            drawPath(body, zoneColor, style = Stroke(width = 4f))
 
-            // typical waist markers: dashed verticals at the mid-typical width (WHtR 0.45)
-            val typicalHalf = waistHalf(0.45)
+            // Head — with a cute bob for her, short crop for him
+            val headR = h * 0.066f
+            val headC = Offset(cx, Y(0.088f))
+            if (female) {
+                drawCircle(zoneColor, headR * 1.28f, Offset(cx, Y(0.082f)))          // hair crown
+                listOf(-1, 1).forEach { sgn ->                                        // bob strands
+                    drawRoundRect(zoneColor,
+                        topLeft = Offset(cx + sgn * headR * 0.72f - headR * 0.30f, Y(0.075f)),
+                        size = androidx.compose.ui.geometry.Size(headR * 0.60f, h * 0.088f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(headR * 0.3f, headR * 0.3f))
+                    drawCircle(zoneColor, headR * 0.34f,                              // flipped ends
+                        Offset(cx + sgn * headR * 0.86f, Y(0.075f) + h * 0.086f))
+                }
+                drawCircle(PL.Card, headR * 0.90f, Offset(cx, Y(0.098f)))            // face
+            } else {
+                drawCircle(zoneColor, headR * 1.10f, Offset(cx, Y(0.080f)))          // crop
+                drawCircle(PL.Card, headR * 0.92f, Offset(cx, Y(0.094f)))
+                drawCircle(zoneColor, headR * 0.92f, Offset(cx, Y(0.094f)), style = Stroke(width = 3f))
+            }
+
+            // Typical-waist dashed markers (WHtR 0.45)
+            val typicalHalf = waistHalf(0.45f)
             val dash = PathEffect.dashPathEffect(floatArrayOf(9f, 8f))
             listOf(-1, 1).forEach { sgn ->
-                drawLine(Color(0xFF8CA0BE), 
-                    Offset(cx + sgn * typicalHalf, Y(0.41f)),
-                    Offset(cx + sgn * typicalHalf, Y(0.545f)),
+                drawLine(Color(0xFF8CA0BE),
+                    Offset(cx + sgn * typicalHalf, Y(0.39f)),
+                    Offset(cx + sgn * typicalHalf, Y(0.50f)),
                     strokeWidth = 2.5f, pathEffect = dash)
             }
         }
