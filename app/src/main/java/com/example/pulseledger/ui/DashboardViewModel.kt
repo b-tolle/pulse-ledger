@@ -218,10 +218,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         return (6 downTo 0).map { back -> byDay[today - back * dayMs]?.let(pick) }
     }
 
-    fun addShot(doseUnits: Double, name: String) {
+    fun addShot(doseUnits: Double, name: String, epochMs: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
-            Db.get(getApplication()).dao().upsertShot(
-                MedShot(System.currentTimeMillis(), doseUnits, name))
+            Db.get(getApplication()).dao().upsertShot(MedShot(epochMs, doseUnits, name))
             load()
         }
     }
@@ -235,9 +234,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addWeight(lbs: Double) {
+    fun addWeight(lbs: Double, epochMs: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
-            val nowMs = System.currentTimeMillis()
+            val nowMs = epochMs
             Db.get(getApplication()).dao().upsertWeights(listOf(WeightEntry(nowMs, lbs, "manual")))
             runCatching { HealthConnectManager(getApplication()).writeWeight(nowMs, lbs) }
             load()

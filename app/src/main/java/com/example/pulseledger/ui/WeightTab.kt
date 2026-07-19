@@ -24,7 +24,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun WeightTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
     var showAdd by remember { mutableStateOf(false) }
-    if (showAdd) AddWeightDialog(onDismiss = { showAdd = false }, onSave = { showAdd = false; vm.addWeight(it) })
+    if (showAdd) AddWeightDialog(onDismiss = { showAdd = false },
+        onSave = { lbs, epoch -> showAdd = false; vm.addWeight(lbs, epoch) })
     val w = ui.weights
     val last = w.lastOrNull()?.lbs
     val weekAgo = System.currentTimeMillis() - 7 * 86_400_000L
@@ -253,19 +254,31 @@ private fun ShapeOutline(waistIn: Double, heightIn: Double) {
 }
 
 @Composable
-private fun AddWeightDialog(onDismiss: () -> Unit, onSave: (Double) -> Unit) {
+private fun AddWeightDialog(onDismiss: () -> Unit, onSave: (Double, Long) -> Unit) {
     var lbs by remember { mutableStateOf("") }
+    var date by remember {
+        mutableStateOf(java.time.LocalDate.now()
+            .format(DateTimeFormatter.ofPattern("MM/dd/yyyy")))
+    }
     val v = lbs.toDoubleOrNull()
-    val valid = v != null && v in 60.0..700.0
+    val epoch = parseEntryDate(date)
+    val valid = v != null && v in 60.0..700.0 && epoch != null
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = PL.CardUp,
         title = { Text("Log weight", color = PL.Txt) },
         text = {
-            OutlinedTextField(lbs, { lbs = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
-                label = { Text("Pounds") }, singleLine = true)
+            Column {
+                OutlinedTextField(lbs, { lbs = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
+                    label = { Text("Pounds") }, singleLine = true)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(date, { date = it.take(10) },
+                    label = { Text("Date (MM/DD/YYYY)") }, singleLine = true)
+                Text("Defaults to today — edit to add past weigh-ins.",
+                    color = PL.Soft, fontSize = 11.5.sp, modifier = Modifier.padding(top = 6.dp))
+            }
         },
         confirmButton = {
-            TextButton(enabled = valid, onClick = { onSave(v!!) }) {
+            TextButton(enabled = valid, onClick = { onSave(v!!, epoch!!) }) {
                 Text("Save", color = if (valid) PL.Charge else PL.Soft)
             }
         },

@@ -77,6 +77,8 @@ data class RangeSpec(
     val value: Double,
     val trackMin: Double, val trackMax: Double,
     val lo: Double, val hi: Double,   // typical-range band
+    val goodBelow: Boolean = false,   // below typical is the GOOD direction (BRI, waist)
+    val goodAbove: Boolean = false,   // above typical is the GOOD direction (HRV, steps)
 )
 
 enum class RangeStatus { BELOW, IN, ABOVE }
@@ -93,7 +95,7 @@ fun RangeBand(spec: RangeSpec) {
                 modifier = Modifier.weight(1f))
             Text(spec.display, color = PL.Soft, fontSize = 13.sp, fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(end = 8.dp))
-            StatusChip(st)
+            StatusChip(st, spec.goodBelow, spec.goodAbove)
         }
         Spacer(Modifier.height(8.dp))
         Canvas(Modifier.fillMaxWidth().height(26.dp)) {
@@ -106,7 +108,9 @@ fun RangeBand(spec: RangeSpec) {
             // base track
             drawRoundRect(PL.CardUp, Offset(0f, ty), Size(w, trackH), CornerRadius(9f, 9f))
             // filled portion up to value — green in range, amber out
-            val fillC = if (st == RangeStatus.IN) Color(0xFF57C97B) else Color(0xFFE7A93C)
+            val good = st == RangeStatus.IN ||
+                (st == RangeStatus.BELOW && spec.goodBelow) || (st == RangeStatus.ABOVE && spec.goodAbove)
+            val fillC = if (good) Color(0xFF57C97B) else Color(0xFFE7A93C)
             val fillW = px(spec.value).coerceAtLeast(trackH)
             drawRoundRect(fillC, Offset(0f, ty), Size(fillW, trackH), CornerRadius(9f, 9f))
             // dashed typical-range outline
@@ -127,11 +131,15 @@ fun RangeBand(spec: RangeSpec) {
 }
 
 @Composable
-private fun StatusChip(st: RangeStatus) {
-    val (label, bg, fg) = when (st) {
-        RangeStatus.IN -> Triple("In range", Color(0xFF1E3A2A), Color(0xFF7BE495))
-        RangeStatus.ABOVE -> Triple("Above range", Color(0xFF443A14), Color(0xFFF0C36D))
-        RangeStatus.BELOW -> Triple("Below range", Color(0xFF443A14), Color(0xFFF0C36D))
+private fun StatusChip(st: RangeStatus, goodBelow: Boolean, goodAbove: Boolean) {
+    val green = Triple("", Color(0xFF1E3A2A), Color(0xFF7BE495))
+    val amber = Triple("", Color(0xFF443A14), Color(0xFFF0C36D))
+    val (label, bg, fg) = when {
+        st == RangeStatus.IN -> green.copy(first = "In range")
+        st == RangeStatus.BELOW && goodBelow -> green.copy(first = "Leaner than typical")
+        st == RangeStatus.ABOVE && goodAbove -> green.copy(first = "Above typical")
+        st == RangeStatus.ABOVE -> amber.copy(first = "Above range")
+        else -> amber.copy(first = "Below range")
     }
     Text(label, color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
         modifier = Modifier.background(bg, RoundedCornerShape(999.dp))
@@ -158,7 +166,7 @@ fun heartRanges(ui: DashboardViewModel.Ui): List<RangeSpec> = buildList {
         add(RangeSpec("Resting heart rate", "$it bpm", it.toDouble(), 40.0, 110.0, lo, hi))
     }
     ui.hrvLatest?.let {
-        add(RangeSpec("HRV (overnight)", "%.0f ms".format(it), it, 0.0, 100.0, 20.0, 50.0))
+        add(RangeSpec("HRV (overnight)", "%.0f ms".format(it), it, 0.0, 100.0, 20.0, 50.0, goodAbove = true))
     }
 }
 
@@ -176,8 +184,8 @@ fun sleepRanges(ui: DashboardViewModel.Ui): List<RangeSpec> = buildList {
             .sumOf { (it.end - it.start) / 60_000 }.toDouble()
         val deepPct = mins(setOf(5)) / total * 100
         val remPct = mins(setOf(6)) / total * 100
-        add(RangeSpec("Deep sleep", "%.0f%%".format(deepPct), deepPct, 0.0, 40.0, 10.0, 25.0))
-        add(RangeSpec("REM sleep", "%.0f%%".format(remPct), remPct, 0.0, 40.0, 15.0, 25.0))
+        add(RangeSpec("Deep sleep", "%.0f%%".format(deepPct), deepPct, 0.0, 40.0, 10.0, 25.0, goodAbove = true))
+        add(RangeSpec("REM sleep", "%.0f%%".format(remPct), remPct, 0.0, 40.0, 15.0, 25.0, goodAbove = true))
     }
 }
 
@@ -196,7 +204,7 @@ fun pressureRanges(ui: DashboardViewModel.Ui): List<RangeSpec> = buildList {
 fun activityRanges(ui: DashboardViewModel.Ui): List<RangeSpec> = buildList {
     ui.steps7dAvg?.let {
         add(RangeSpec("Steps (7-day avg)", "%,d".format(it), it.toDouble(),
-            0.0, 15_000.0, 7_000.0, 10_000.0))
+            0.0, 15_000.0, 7_000.0, 10_000.0, goodAbove = true))
     }
 }
 
@@ -208,9 +216,9 @@ fun weightRanges(ui: DashboardViewModel.Ui): List<RangeSpec> = buildList {
         add(RangeSpec("BMI", "%.1f".format(bmi), bmi, 14.0, 42.0, 18.5, 24.9))
         Profile.waistIn?.let { w ->
             val whtr = w / h
-            add(RangeSpec("Waist-to-height", "%.2f".format(whtr), whtr, 0.30, 0.80, 0.40, 0.49))
+            add(RangeSpec("Waist-to-height", "%.2f".format(whtr), whtr, 0.30, 0.80, 0.40, 0.49, goodBelow = true))
             val bri = bri(w, h.toDouble())
-            add(RangeSpec("Body Roundness Index", "%.1f".format(bri), bri, 1.0, 12.0, 3.41, 5.46))
+            add(RangeSpec("Body Roundness Index", "%.1f".format(bri), bri, 1.0, 12.0, 3.41, 5.46, goodBelow = true))
         }
     }
 }

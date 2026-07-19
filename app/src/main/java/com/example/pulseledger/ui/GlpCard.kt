@@ -29,19 +29,20 @@ fun GlpTracker(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
     if (showDose) DoseDialog(
         defaultUnits = last?.doseUnits ?: 40.0,
         onDismiss = { showDose = false },
-        onSave = { units -> showDose = false; vm.addShot(units, "Tirzepatide") },
+        onSave = { units, epoch -> showDose = false; vm.addShot(units, "Tirzepatide", epoch) },
     )
 
     if (last == null) {
         Card {
             SectionLabel("MEDICATION")
             Spacer(Modifier.height(6.dp))
-            Text("Track weekly GLP-1 shots (tirzepatide)? Log your first shot and the app will show when the next one is due.",
+            Text("Track weekly GLP-1 shots (tirzepatide)? Log a shot — you can backdate it — and the app shows when the next is due.",
                 color = PL.Soft, fontSize = 13.sp, lineHeight = 19.sp)
             Spacer(Modifier.height(10.dp))
             OutlinedButton(onClick = { showDose = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("I took my shot today", color = PL.Charge)
+                Text("Log a shot", color = PL.Charge)
             }
+            HungerSection(ui, vm)
         }
         return
     }
@@ -81,7 +82,7 @@ fun GlpTracker(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
             Button(
                 onClick = { showDose = true }, modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = PL.Charge),
-            ) { Text("Took my shot", color = PL.Bg, fontSize = 13.sp) }
+            ) { Text("Log shot", color = PL.Bg, fontSize = 13.sp) }
             OutlinedButton(
                 onClick = {
                     val begin = Instant.ofEpochMilli(dueMs).atZone(ZoneId.systemDefault())
@@ -99,30 +100,7 @@ fun GlpTracker(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
             ) { Text("Remind me", color = PL.Soft, fontSize = 13.sp) }
         }
 
-        // Daily appetite check-in
-        Spacer(Modifier.height(14.dp))
-        Text("HOW HUNGRY TODAY?", color = PL.Soft, fontSize = 10.sp,
-            fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-        Spacer(Modifier.height(6.dp))
-        val todayLevel = ui.hungerWeek.lastOrNull()
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            (1..5).forEach { lvl ->
-                FilterChip(
-                    selected = todayLevel?.toInt() == lvl,
-                    onClick = { vm.logHunger(lvl) },
-                    label = { Text("$lvl", fontSize = 13.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = PL.CardUp, selectedLabelColor = PL.Txt,
-                        containerColor = PL.Card, labelColor = PL.Dim),
-                )
-            }
-        }
-        Text("1 = not hungry · 5 = very hungry", color = PL.Dim, fontSize = 10.sp,
-            modifier = Modifier.padding(top = 4.dp))
-        if (ui.hungerWeek.count { it != null } >= 2) {
-            Spacer(Modifier.height(8.dp))
-            WeekBars(ui.hungerWeek, PL.Drain, 36, labels = null)
-        }
+        HungerSection(ui, vm)
         Spacer(Modifier.height(8.dp))
         Text("Records what you enter — confirm dose and schedule with your prescriber.",
             color = PL.Dim, fontSize = 10.sp)
@@ -130,10 +108,51 @@ fun GlpTracker(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
 }
 
 @Composable
-private fun DoseDialog(defaultUnits: Double, onDismiss: () -> Unit, onSave: (Double) -> Unit) {
+private fun HungerSection(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
+    Spacer(Modifier.height(14.dp))
+    Text("HOW HUNGRY TODAY?", color = PL.Soft, fontSize = 10.sp,
+        fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+    Spacer(Modifier.height(6.dp))
+    val todayLevel = ui.hungerWeek.lastOrNull()
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        (1..5).forEach { lvl ->
+            FilterChip(
+                selected = todayLevel?.toInt() == lvl,
+                onClick = { vm.logHunger(lvl) },
+                label = { Text("$lvl", fontSize = 13.sp) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = PL.CardUp, selectedLabelColor = PL.Txt,
+                    containerColor = PL.Card, labelColor = PL.Dim),
+            )
+        }
+    }
+    Text("1 = not hungry · 5 = very hungry", color = PL.Dim, fontSize = 10.sp,
+        modifier = Modifier.padding(top = 4.dp))
+    if (ui.hungerWeek.count { it != null } >= 2) {
+        Spacer(Modifier.height(8.dp))
+        WeekBars(ui.hungerWeek, PL.Drain, 36, labels = null)
+    }
+}
+
+/** Parses M/d/yyyy; returns epoch at noon local, or null. Rejects future/ancient. */
+fun parseEntryDate(s: String): Long? {
+    val d = runCatching {
+        java.time.LocalDate.parse(s, DateTimeFormatter.ofPattern("M/d/yyyy", java.util.Locale.US))
+    }.getOrNull() ?: return null
+    if (d.year < 2000 || d.isAfter(java.time.LocalDate.now().plusDays(1))) return null
+    return d.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+}
+
+@Composable
+private fun DoseDialog(defaultUnits: Double, onDismiss: () -> Unit, onSave: (Double, Long) -> Unit) {
     var units by remember { mutableStateOf("%.0f".format(defaultUnits)) }
+    var date by remember {
+        mutableStateOf(java.time.LocalDate.now()
+            .format(DateTimeFormatter.ofPattern("MM/dd/yyyy")))
+    }
     val v = units.toDoubleOrNull()
-    val valid = v != null && v in 1.0..200.0
+    val epoch = parseEntryDate(date)
+    val valid = v != null && v in 1.0..200.0 && epoch != null
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = PL.CardUp,
         title = { Text("Log shot", color = PL.Txt) },
@@ -141,12 +160,15 @@ private fun DoseDialog(defaultUnits: Double, onDismiss: () -> Unit, onSave: (Dou
             Column {
                 OutlinedTextField(units, { units = it.filter(Char::isDigit).take(3) },
                     label = { Text("Dose (units)") }, singleLine = true)
-                Text("Defaults to your last dose. Next shot will show due 1 week from now.",
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(date, { date = it.take(10) },
+                    label = { Text("Date (MM/DD/YYYY)") }, singleLine = true)
+                Text("Defaults to today — edit to backdate. Next shot shows due 1 week after this date.",
                     color = PL.Soft, fontSize = 11.5.sp, modifier = Modifier.padding(top = 6.dp))
             }
         },
         confirmButton = {
-            TextButton(enabled = valid, onClick = { onSave(v!!) }) {
+            TextButton(enabled = valid, onClick = { onSave(v!!, epoch!!) }) {
                 Text("Save", color = if (valid) PL.Charge else PL.Soft)
             }
         },
