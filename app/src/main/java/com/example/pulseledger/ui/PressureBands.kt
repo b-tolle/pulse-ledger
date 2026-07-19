@@ -44,7 +44,7 @@ fun PressureBandChart(readings: List<BpReading>, windowDays: Long? = null) {
         fun x(t: Long) = padL + (w - padL - padR) * (t - t0).toFloat() / (t1 - t0).toFloat()
 
         val axis = android.graphics.Paint().apply {
-            color = android.graphics.Color.parseColor("#5B6D8A"); textSize = 24f
+            color = android.graphics.Color.parseColor("#8FA2BF"); textSize = 24f
         }
 
         // baseline gridlines

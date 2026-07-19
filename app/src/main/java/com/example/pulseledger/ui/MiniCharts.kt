@@ -40,7 +40,7 @@ fun WeekBars(values: List<Double?>, accent: Color, heightDp: Int = 44, labels: L
                     label, x + bw / 2 - label.length * 6f, size.height - 4f,
                     android.graphics.Paint().apply {
                         color = if (isLast) android.graphics.Color.parseColor("#EAF0F9")
-                        else android.graphics.Color.parseColor("#5B6D8A")
+                        else android.graphics.Color.parseColor("#8FA2BF")
                         textSize = 22f
                     })
             }

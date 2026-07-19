@@ -92,7 +92,7 @@ fun FramedChart(
                 drawLine(PL.Line, Offset(padL, gy), Offset(w - 8f, gy), strokeWidth = 1.5f)
                 drawContext.canvas.nativeCanvas.apply {
                     drawText(fmtValue(gv), 4f, gy + 8f, android.graphics.Paint().apply {
-                        this.color = android.graphics.Color.parseColor("#5B6D8A")
+                        this.color = android.graphics.Color.parseColor("#8FA2BF")
                         textSize = 24f
                     })
                 }

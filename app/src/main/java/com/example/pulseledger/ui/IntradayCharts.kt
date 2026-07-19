@@ -20,7 +20,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 private fun axisPaint() = android.graphics.Paint().apply {
-    color = android.graphics.Color.parseColor("#5B6D8A"); textSize = 24f
+    color = android.graphics.Color.parseColor("#8FA2BF"); textSize = 24f
 }
 
 /** The pretty 24-hour HR curve: gradient area, gaps preserved, midnight→now. */
@@ -97,7 +97,7 @@ fun Hypnogram(night: HealthConnectManager.SleepNight, heightDp: Int = 150) {
         fun blockBot(r: Int) = blockTop(r) + rowH * 0.60f
 
         val axisPaint = android.graphics.Paint().apply {
-            color = android.graphics.Color.parseColor("#5B6D8A"); textSize = 24f
+            color = android.graphics.Color.parseColor("#8FA2BF"); textSize = 24f
         }
         labels.forEachIndexed { i, lab ->
             drawContext.canvas.nativeCanvas.drawText(lab, 8f, padT + rowH * i + rowH / 2 + 8f, axisPaint)

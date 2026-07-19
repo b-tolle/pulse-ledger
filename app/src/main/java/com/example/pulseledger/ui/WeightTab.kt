@@ -89,7 +89,7 @@ private fun WeightChart(entries: List<WeightEntry>, goal: Double?) {
         fun x(t: Long) = padL + (w - padL - 10f) * (t - t0).toFloat() / (t1 - t0).toFloat()
         fun y(v: Double) = padT + (h - padB - padT) * (1f - ((v - lo) / (hi - lo)).toFloat())
         val axis = android.graphics.Paint().apply {
-            color = android.graphics.Color.parseColor("#5B6D8A"); textSize = 24f
+            color = android.graphics.Color.parseColor("#8FA2BF"); textSize = 24f
         }
         listOf(lo + 3, (lo + hi) / 2, hi - 3).forEach { g ->
             val gy = y(g)
@@ -182,7 +182,7 @@ private fun BodyCard(lastLbs: Double?) {
 
 @Composable
 private fun ShapeOutline(waistIn: Double, heightIn: Double) {
-    val ratio = (waistIn / heightIn).toFloat()
+    val ratio = (waistIn / heightIn)
     val briVal = bri(waistIn, heightIn)
     val (zoneColor, zoneLabel) = when {
         briVal < 3.41 -> PL.Dia to "Lean shape"
@@ -193,71 +193,83 @@ private fun ShapeOutline(waistIn: Double, heightIn: Double) {
     Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth()) {
         Canvas(Modifier.fillMaxWidth().height(230.dp)) {
-            val h = size.height - 10f
+            val h = size.height - 8f
             val cx = size.width / 2f
-            fun Y(f: Float) = 5f + h * f
-            // Calibrated waist half-width: lean ratios read visibly slim,
-            // high ratios push the waist out past the hips (apple shape).
-            fun waistHalf(r: Float) =
-                h * (0.052f + ((r - 0.35f) / 0.30f).coerceIn(0f, 1.3f) * 0.135f)
-            val W = waistHalf(ratio)
+            fun Y(f: Float) = 4f + h * f
+            fun X(f: Float) = cx + h * f          // widths in height-units, sign carries side
             val female = Profile.female
-            val shoulder = h * (if (female) 0.125f else 0.150f)
-            val bust = h * (if (female) 0.118f else 0.130f)
-            val hip = if (female) maxOf(h * 0.135f, W * 1.02f) else maxOf(h * 0.112f, W * 0.98f)
-            val bulge = maxOf(hip, W) * 1.12f
 
+            // Lean-calibrated waist half-width (in height units).
+            // WHtR 0.43 → ~0.106, 0.50 → ~0.145, 0.60 → ~0.20.
+            fun waistHalf(r: Double) =
+                (0.062f + ((r - 0.35).toFloat()) * 0.55f).coerceIn(0.055f, 0.24f)
+            val W = waistHalf(ratio)
+            val shoulder = if (female) 0.135f else 0.158f
+            val bust = if (female) 0.125f else 0.135f
+            val hip = if (female) maxOf(W * 1.32f, 0.128f).coerceAtMost(0.20f)
+                      else maxOf(W * 1.06f, 0.118f).coerceAtMost(0.20f)
+            val neck = 0.028f
+            val thighOut = hip * 0.72f
+            val kneeOut = 0.052f
+            val ankleOut = 0.030f
+
+            // ONE closed outline (down left, up between the legs, down again, up right)
             val body = Path().apply {
-                moveTo(cx - h * 0.045f, Y(0.165f))                                   // neck L
-                quadraticBezierTo(cx - shoulder * 1.15f, Y(0.185f), cx - shoulder, Y(0.225f))
-                quadraticBezierTo(cx - bust * 1.10f, Y(0.27f), cx - bust, Y(0.315f))
-                quadraticBezierTo(cx - W * 0.90f, Y(0.385f), cx - W, Y(0.445f))      // waist L
-                quadraticBezierTo(cx - bulge, Y(0.52f), cx - hip, Y(0.575f))         // hip L
-                quadraticBezierTo(cx - hip * 0.92f, Y(0.66f), cx - hip * 0.62f, Y(0.75f))
-                quadraticBezierTo(cx - h * 0.065f, Y(0.86f), cx - h * 0.052f, Y(0.965f))
-                lineTo(cx - h * 0.020f, Y(0.965f))                                   // L foot inner
-                quadraticBezierTo(cx - h * 0.030f, Y(0.80f), cx - h * 0.012f, Y(0.645f))
-                quadraticBezierTo(cx, Y(0.618f), cx + h * 0.012f, Y(0.645f))         // crotch
-                quadraticBezierTo(cx + h * 0.030f, Y(0.80f), cx + h * 0.020f, Y(0.965f))
-                lineTo(cx + h * 0.052f, Y(0.965f))                                   // R foot outer
-                quadraticBezierTo(cx + h * 0.065f, Y(0.86f), cx + hip * 0.62f, Y(0.75f))
-                quadraticBezierTo(cx + hip * 0.92f, Y(0.66f), cx + hip, Y(0.575f))
-                quadraticBezierTo(cx + bulge, Y(0.52f), cx + W, Y(0.445f))           // waist R
-                quadraticBezierTo(cx + W * 0.90f, Y(0.385f), cx + bust, Y(0.315f))
-                quadraticBezierTo(cx + bust * 1.10f, Y(0.27f), cx + shoulder, Y(0.225f))
-                quadraticBezierTo(cx + shoulder * 1.15f, Y(0.185f), cx + h * 0.045f, Y(0.165f))
+                moveTo(X(-neck), Y(0.185f))
+                quadraticBezierTo(X(-shoulder * 1.02f), Y(0.215f), X(-shoulder), Y(0.255f))
+                quadraticBezierTo(X(-bust * 1.05f), Y(0.30f), X(-bust), Y(0.335f))
+                quadraticBezierTo(X(-W * 0.97f), Y(0.40f), X(-W), Y(0.445f))
+                quadraticBezierTo(X(-hip * 1.04f), Y(0.50f), X(-hip), Y(0.535f))
+                quadraticBezierTo(X(-thighOut), Y(0.64f), X(-kneeOut * 1.35f), Y(0.76f))
+                quadraticBezierTo(X(-kneeOut), Y(0.85f), X(-ankleOut), Y(0.955f))
+                lineTo(X(-0.008f), Y(0.965f))                                  // left foot
+                quadraticBezierTo(X(-0.016f), Y(0.80f), X(-0.020f), Y(0.70f))  // inner left leg
+                quadraticBezierTo(X(-0.014f), Y(0.60f), X(0f), Y(0.565f))      // crotch
+                quadraticBezierTo(X(0.014f), Y(0.60f), X(0.020f), Y(0.70f))    // inner right leg
+                quadraticBezierTo(X(0.016f), Y(0.80f), X(0.008f), Y(0.965f))
+                lineTo(X(ankleOut), Y(0.955f))                                 // right foot
+                quadraticBezierTo(X(kneeOut), Y(0.85f), X(kneeOut * 1.35f), Y(0.76f))
+                quadraticBezierTo(X(thighOut), Y(0.64f), X(hip), Y(0.535f))
+                quadraticBezierTo(X(hip * 1.04f), Y(0.50f), X(W), Y(0.445f))
+                quadraticBezierTo(X(W * 0.97f), Y(0.40f), X(bust), Y(0.335f))
+                quadraticBezierTo(X(bust * 1.05f), Y(0.30f), X(shoulder), Y(0.255f))
+                quadraticBezierTo(X(shoulder * 1.02f), Y(0.215f), X(neck), Y(0.185f))
                 close()
             }
-            drawPath(body, zoneColor.copy(alpha = 0.20f))
+            drawPath(body, zoneColor.copy(alpha = 0.14f))
             drawPath(body, zoneColor, style = Stroke(width = 4f))
 
-            // Head — with a cute bob for her, short crop for him
-            val headR = h * 0.066f
-            val headC = Offset(cx, Y(0.088f))
+            // Head + (for her) a cute chin-length bob
+            val headR = h * 0.058f
+            val headC = Offset(cx, Y(0.095f))
             if (female) {
-                drawCircle(zoneColor, headR * 1.28f, Offset(cx, Y(0.082f)))          // hair crown
-                listOf(-1, 1).forEach { sgn ->                                        // bob strands
-                    drawRoundRect(zoneColor,
-                        topLeft = Offset(cx + sgn * headR * 0.72f - headR * 0.30f, Y(0.075f)),
-                        size = androidx.compose.ui.geometry.Size(headR * 0.60f, h * 0.088f),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(headR * 0.3f, headR * 0.3f))
-                    drawCircle(zoneColor, headR * 0.34f,                              // flipped ends
-                        Offset(cx + sgn * headR * 0.86f, Y(0.075f) + h * 0.086f))
+                val hair = Path().apply {
+                    moveTo(X(-0.072f), Y(0.105f))
+                    quadraticBezierTo(X(-0.078f), Y(0.02f), X(0f), Y(0.012f))   // crown
+                    quadraticBezierTo(X(0.078f), Y(0.02f), X(0.072f), Y(0.105f))
+                    quadraticBezierTo(X(0.075f), Y(0.150f), X(0.052f), Y(0.163f)) // right bob tip
+                    quadraticBezierTo(X(0.040f), Y(0.132f), X(0.040f), Y(0.112f)) // tuck to face
+                    quadraticBezierTo(X(0f), Y(0.128f), X(-0.040f), Y(0.112f))
+                    quadraticBezierTo(X(-0.040f), Y(0.132f), X(-0.052f), Y(0.163f)) // left bob tip
+                    quadraticBezierTo(X(-0.075f), Y(0.150f), X(-0.072f), Y(0.105f))
+                    close()
                 }
-                drawCircle(PL.Card, headR * 0.90f, Offset(cx, Y(0.098f)))            // face
+                drawPath(hair, zoneColor.copy(alpha = 0.30f))
+                drawPath(hair, zoneColor, style = Stroke(width = 3.5f))
+                // face peeks out under the fringe
+                drawCircle(zoneColor, radius = headR, center = headC, style = Stroke(width = 3f))
             } else {
-                drawCircle(zoneColor, headR * 1.10f, Offset(cx, Y(0.080f)))          // crop
-                drawCircle(PL.Card, headR * 0.92f, Offset(cx, Y(0.094f)))
-                drawCircle(zoneColor, headR * 0.92f, Offset(cx, Y(0.094f)), style = Stroke(width = 3f))
+                drawCircle(zoneColor.copy(alpha = 0.14f), radius = headR, center = headC)
+                drawCircle(zoneColor, radius = headR, center = headC, style = Stroke(width = 4f))
             }
 
-            // Typical-waist dashed markers (WHtR 0.45)
-            val typicalHalf = waistHalf(0.45f)
+            // dashed mid-typical waist markers
+            val typicalHalf = waistHalf(0.45)
             val dash = PathEffect.dashPathEffect(floatArrayOf(9f, 8f))
             listOf(-1, 1).forEach { sgn ->
-                drawLine(Color(0xFF8CA0BE),
-                    Offset(cx + sgn * typicalHalf, Y(0.39f)),
-                    Offset(cx + sgn * typicalHalf, Y(0.50f)),
+                drawLine(Color(0xFF9FB2CD),
+                    Offset(X(sgn * typicalHalf), Y(0.40f)),
+                    Offset(X(sgn * typicalHalf), Y(0.50f)),
                     strokeWidth = 2.5f, pathEffect = dash)
             }
         }
