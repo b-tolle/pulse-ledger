@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         hc = HealthConnectManager(this)
+        com.example.pulseledger.ui.Profile.init(this)
         sharedUris = extractShared(intent)
 
         lifecycleScope.launch {

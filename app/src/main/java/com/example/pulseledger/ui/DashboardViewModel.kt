@@ -9,6 +9,7 @@ import com.example.pulseledger.data.HealthConnectManager
 import com.example.pulseledger.data.db.BpReading
 import com.example.pulseledger.data.db.DailySummary
 import com.example.pulseledger.data.db.LocationDay
+import com.example.pulseledger.data.db.WeightEntry
 import com.example.pulseledger.life.CalendarReader
 import com.example.pulseledger.life.Places
 import com.example.pulseledger.life.CurrentLocation
@@ -58,6 +59,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val weekLabels: List<String> = emptyList(),
         val sleepNight: HealthConnectManager.SleepNight? = null,
         val workouts: List<WorkoutUi> = emptyList(),
+        val weights: List<WeightEntry> = emptyList(),   // oldest first
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -144,6 +146,14 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val histDays = dao.stepDaysCount()
                 val histSince = dao.earliestStepDay()
                 val allSummaries = dao.allSummaries()
+                val localWeights = dao.allWeights()
+                val hcWeights = runCatching {
+                    hc.readWeights(now.minus(Duration.ofDays(3650)), now)
+                }.getOrDefault(emptyList())
+                val weights = (localWeights +
+                    hcWeights.map { WeightEntry(it.first, it.second, "hc") })
+                    .distinctBy { it.epochMillis / 60_000 }
+                    .sortedBy { it.epochMillis }
                 val locDaysList = dao.allLocationDays()
                 val locDays = locDaysList.associateBy { it.dayEpoch }
                 val anchors = Places.learnAnchors(locDaysList)
@@ -179,6 +189,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     weekLabels = weekLabels,
                     sleepNight = night,
                     workouts = workouts,
+                    weights = weights,
                 )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(loading = false, error = t.message ?: "read failed")
@@ -193,6 +204,15 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val today = now - now % dayMs
         val byDay = _ui.value.summaries.associateBy { it.dayEpoch }
         return (6 downTo 0).map { back -> byDay[today - back * dayMs]?.let(pick) }
+    }
+
+    fun addWeight(lbs: Double) {
+        viewModelScope.launch {
+            val nowMs = System.currentTimeMillis()
+            Db.get(getApplication()).dao().upsertWeights(listOf(WeightEntry(nowMs, lbs, "manual")))
+            runCatching { HealthConnectManager(getApplication()).writeWeight(nowMs, lbs) }
+            load()
+        }
     }
 
     fun addManual(sys: Int, dia: Int, pulse: Int?) {

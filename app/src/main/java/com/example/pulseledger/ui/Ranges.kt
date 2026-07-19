@@ -19,19 +19,52 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** User profile — drives peer ranges and HR zone thresholds. */
+/** Per-device user profile, editable in the Profile sheet. Defaults = Brian. */
 object Profile {
-    val birth: java.time.LocalDate = java.time.LocalDate.of(1981, 4, 23)
+    private var prefs: android.content.SharedPreferences? = null
+    val rev = androidx.compose.runtime.mutableIntStateOf(0)
+
+    fun init(ctx: android.content.Context) {
+        prefs = ctx.getSharedPreferences("profile", android.content.Context.MODE_PRIVATE)
+    }
+    private fun p() = prefs
+
+    var birth: java.time.LocalDate
+        get() = runCatching { java.time.LocalDate.parse(p()?.getString("birth", null) ?: "1981-04-23") }
+            .getOrDefault(java.time.LocalDate.of(1981, 4, 23))
+        set(v) { p()?.edit()?.putString("birth", v.toString())?.apply(); rev.intValue++ }
+
+    var female: Boolean
+        get() = p()?.getBoolean("female", false) ?: false
+        set(v) { p()?.edit()?.putBoolean("female", v)?.apply(); rev.intValue++ }
+
+    var heightIn: Int?
+        get() = (p()?.getInt("heightIn", 0) ?: 0).takeIf { it > 0 }
+        set(v) { p()?.edit()?.putInt("heightIn", v ?: 0)?.apply(); rev.intValue++ }
+
+    var waistIn: Double?
+        get() = (p()?.getFloat("waistIn", 0f) ?: 0f).toDouble().takeIf { it > 0 }
+        set(v) { p()?.edit()?.putFloat("waistIn", (v ?: 0.0).toFloat())?.apply(); rev.intValue++ }
+
+    var goalLbs: Double?
+        get() = (p()?.getFloat("goalLbs", 0f) ?: 0f).toDouble().takeIf { it > 0 }
+        set(v) { p()?.edit()?.putFloat("goalLbs", (v ?: 0.0).toFloat())?.apply(); rev.intValue++ }
+
+    var startTab: Int
+        get() = p()?.getInt("startTab", 0) ?: 0
+        set(v) { p()?.edit()?.putInt("startTab", v)?.apply(); rev.intValue++ }
+
     val age: Int get() = java.time.Period.between(birth, java.time.LocalDate.now()).years
-    /** Tanaka max HR: 208 − 0.7 × age. */
     val maxHr: Int get() = (208 - 0.7 * age).toInt()
-    val zoneLight: Int get() = (maxHr * 0.50).toInt()      // 50% max
-    val zoneModerate: Int get() = (maxHr * 0.64).toInt()   // CDC moderate 64–76%
-    val zoneVigorous: Int get() = (maxHr * 0.77).toInt()   // CDC vigorous 77%+
+    val zoneLight: Int get() = (maxHr * 0.50).toInt()
+    val zoneModerate: Int get() = (maxHr * 0.64).toInt()
+    val zoneVigorous: Int get() = (maxHr * 0.77).toInt()
 }
 
 object Peer {
-    val LABEL: String get() = "MEN ${Profile.age / 10 * 10}–${Profile.age / 10 * 10 + 9}"
+    val LABEL: String
+        get() = (if (Profile.female) "WOMEN" else "MEN") +
+            " ${Profile.age / 10 * 10}–${Profile.age / 10 * 10 + 9}"
 }
 
 data class RangeSpec(
@@ -117,7 +150,8 @@ fun PeerCard(specs: List<RangeSpec>) {
 
 fun heartRanges(ui: DashboardViewModel.Ui): List<RangeSpec> = buildList {
     ui.restingHr?.let {
-        add(RangeSpec("Resting heart rate", "$it bpm", it.toDouble(), 40.0, 110.0, 55.0, 75.0))
+        val (lo, hi) = if (Profile.female) 58.0 to 78.0 else 55.0 to 75.0
+        add(RangeSpec("Resting heart rate", "$it bpm", it.toDouble(), 40.0, 110.0, lo, hi))
     }
     ui.hrvLatest?.let {
         add(RangeSpec("HRV (overnight)", "%.0f ms".format(it), it, 0.0, 100.0, 20.0, 50.0))
@@ -160,4 +194,25 @@ fun activityRanges(ui: DashboardViewModel.Ui): List<RangeSpec> = buildList {
         add(RangeSpec("Steps (7-day avg)", "%,d".format(it), it.toDouble(),
             0.0, 15_000.0, 7_000.0, 10_000.0))
     }
+}
+
+
+fun weightRanges(ui: DashboardViewModel.Ui): List<RangeSpec> = buildList {
+    val lastLbs = ui.weights.lastOrNull()?.lbs ?: return@buildList
+    Profile.heightIn?.let { h ->
+        val bmi = 703.0 * lastLbs / (h * h)
+        add(RangeSpec("BMI", "%.1f".format(bmi), bmi, 14.0, 42.0, 18.5, 24.9))
+        Profile.waistIn?.let { w ->
+            val whtr = w / h
+            add(RangeSpec("Waist-to-height", "%.2f".format(whtr), whtr, 0.30, 0.80, 0.40, 0.49))
+            val bri = bri(w, h.toDouble())
+            add(RangeSpec("Body Roundness Index", "%.1f".format(bri), bri, 1.0, 12.0, 3.41, 5.46))
+        }
+    }
+}
+
+/** JAMA 2024 Body Roundness Index. Waist + height in the same units. */
+fun bri(waist: Double, height: Double): Double {
+    val term = (waist / (2 * Math.PI)) / (0.5 * height)
+    return 364.2 - 365.5 * Math.sqrt((1.0 - term * term).coerceAtLeast(0.0))
 }

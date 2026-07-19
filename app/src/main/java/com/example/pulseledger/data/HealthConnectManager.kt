@@ -31,6 +31,8 @@ class HealthConnectManager(private val context: Context) {
         HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+        HealthPermission.getReadPermission(WeightRecord::class),
+        HealthPermission.getWritePermission(WeightRecord::class),
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getReadPermission(OxygenSaturationRecord::class),
     )
@@ -144,6 +146,23 @@ class HealthConnectManager(private val context: Context) {
                 it.time.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
             }
             .mapValues { (_, v) -> v.map { it.heartRateVariabilityMillis }.average() }
+    }
+
+    /** All weight records as (epochMs, lbs). */
+    suspend fun readWeights(from: Instant, to: Instant): List<Pair<Long, Double>> =
+        readAll(WeightRecord::class, from, to)
+            .map { it.time.toEpochMilli() to it.weight.inPounds }
+            .sortedBy { it.first }
+
+    suspend fun writeWeight(epochMs: Long, lbs: Double) {
+        client.insertRecords(listOf(
+            WeightRecord(
+                time = Instant.ofEpochMilli(epochMs),
+                zoneOffset = java.time.ZoneId.systemDefault().rules.getOffset(Instant.ofEpochMilli(epochMs)),
+                weight = androidx.health.connect.client.units.Mass.pounds(lbs),
+                metadata = androidx.health.connect.client.records.metadata.Metadata.manualEntry(),
+            )
+        ))
     }
 
     data class Workout(val title: String, val start: Long, val end: Long)

@@ -36,3 +36,11 @@ data class LocationDay(
     val placesJson: String,          // [{lat,lng,label,minutes}] clustered stays
     val pointCount: Int,
 )
+
+
+@androidx.room.Entity(tableName = "weight_entries")
+data class WeightEntry(
+    @androidx.room.PrimaryKey val epochMillis: Long,
+    val lbs: Double,
+    val source: String,
+)

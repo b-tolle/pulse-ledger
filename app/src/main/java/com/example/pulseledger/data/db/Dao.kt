@@ -9,6 +9,11 @@ interface HealthDao {
 
     @Query("DELETE FROM bp_readings WHERE source = 'csv_import'")
     suspend fun deleteCsvReadings()
+
+    @Upsert suspend fun upsertWeights(entries: List<WeightEntry>)
+
+    @Query("SELECT * FROM weight_entries ORDER BY epochMillis ASC")
+    suspend fun allWeights(): List<WeightEntry>
     @Upsert suspend fun upsertSummaries(summaries: List<DailySummary>)
 
     @Query("SELECT * FROM bp_readings ORDER BY epochMillis DESC LIMIT :limit")
@@ -55,8 +60,9 @@ interface HealthDao {
         com.example.pulseledger.life.TogetherSession::class,
         com.example.pulseledger.env.EnvSample::class,
         LocationDay::class,
+        WeightEntry::class,
     ],
-    version = 4,
+    version = 5,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): HealthDao

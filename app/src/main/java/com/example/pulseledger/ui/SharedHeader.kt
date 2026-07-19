@@ -57,6 +57,9 @@ fun AppHeader(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                     },
                 )
             }
+            var showProfile by remember { mutableStateOf(false) }
+            if (showProfile) ProfileSheet(onDismiss = { showProfile = false; vm.load() })
+            TextButton(onClick = { showProfile = true }) { Text("Profile", color = PL.Dim, fontSize = 12.sp) }
             TextButton(onClick = { picker.launch(arrayOf("*/*")) }) { Text("Import", color = PL.Dim, fontSize = 12.sp) }
             TextButton(onClick = vm::load, enabled = !ui.loading) {
                 Text(if (ui.loading) "Syncing…" else "Refresh", color = PL.Dia, fontSize = 12.sp)

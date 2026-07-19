@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.Bloodtype
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.MonitorHeart
+import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,15 +37,17 @@ import java.time.format.DateTimeFormatter
 fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequestPermissions: () -> Unit) {
     val vm: DashboardViewModel = viewModel()
     val ui by vm.ui.collectAsState()
-    var tab by remember { mutableStateOf(0) }
+    val profileRev = Profile.rev.intValue   // recompose on profile changes
+    var tab by remember { mutableStateOf(Profile.startTab.coerceIn(0, 5)) }
     LaunchedEffect(permissionsGranted) { if (permissionsGranted) vm.load() }
 
     val tabs = listOf(
         Triple("Home", Icons.Outlined.Home, 0),
-        Triple("Pressure", Icons.Outlined.Bloodtype, 1),
-        Triple("Heart", Icons.Outlined.MonitorHeart, 2),
-        Triple("Sleep", Icons.Outlined.Bedtime, 3),
-        Triple("Data", Icons.Outlined.Insights, 4),
+        Triple("Weight", Icons.Outlined.MonitorWeight, 1),
+        Triple("Pressure", Icons.Outlined.Bloodtype, 2),
+        Triple("Heart", Icons.Outlined.MonitorHeart, 3),
+        Triple("Sleep", Icons.Outlined.Bedtime, 4),
+        Triple("Data", Icons.Outlined.Insights, 5),
     )
     Scaffold(
         containerColor = PL.Bg,
@@ -75,9 +78,10 @@ fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequest
                 }
                 else -> when (tab) {
                     0 -> HomeTab(ui, vm, onNavigate = { tab = it })
-                    1 -> PressureTab(ui, vm)
-                    2 -> HeartTab(ui, vm)
-                    3 -> SleepTab(ui, vm)
+                    1 -> WeightTab(ui, vm)
+                    2 -> PressureTab(ui, vm)
+                    3 -> HeartTab(ui, vm)
+                    4 -> SleepTab(ui, vm)
                     else -> DataTab(ui, vm)
                 }
             }
