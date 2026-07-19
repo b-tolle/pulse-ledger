@@ -43,7 +43,7 @@ fun HomeTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel, onNavigate: (Int)
         contentPadding = PaddingValues(top = 16.dp, bottom = 20.dp),
     ) {
         item { AppHeader(ui, vm) }
-        item { Greeting(ui); TogetherHeart(ui) }
+        item { Greeting(ui) }
 
         // Charge hero
         item {

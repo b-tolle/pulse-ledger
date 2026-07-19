@@ -65,6 +65,7 @@ fun AppHeader(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                 Text(if (ui.loading) "Syncing…" else "Refresh", color = PL.Dia, fontSize = 12.sp)
             }
         }
+        TogetherHeart(ui)
         checkMsg?.let { Spacer(Modifier.height(6.dp)); Text(it, color = PL.Charge, fontSize = 12.sp) }
         ui.notice?.let { Spacer(Modifier.height(6.dp)); Card { Text(it, color = PL.Charge, fontSize = 12.sp, lineHeight = 17.sp) } }
         ui.error?.let { Spacer(Modifier.height(6.dp)); Card { Text("Health Connect: $it", color = PL.Drain, fontSize = 12.sp) } }

@@ -59,6 +59,12 @@ fun TogetherHeart(ui: DashboardViewModel.Ui) {
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(5_000); now = System.currentTimeMillis() } }
     val near = now - lastSeen < 25_000
+    val btOn = remember(now) {
+        runCatching {
+            (ctx.getSystemService(android.content.Context.BLUETOOTH_SERVICE)
+                as android.bluetooth.BluetoothManager).adapter?.isEnabled == true
+        }.getOrDefault(false)
+    }
 
     val beat = rememberInfiniteTransition(label = "beat")
     val scale by beat.animateFloat(
@@ -75,17 +81,19 @@ fun TogetherHeart(ui: DashboardViewModel.Ui) {
         Icon(
             Icons.Filled.Favorite, contentDescription = "together",
             tint = if (near) PL.Sys else PL.Line,
-            modifier = Modifier.size(20.dp).scale(if (near) scale else 1f),
+            modifier = Modifier.size(18.dp).scale(if (near) scale else 1f),
         )
         Spacer(Modifier.width(8.dp))
         Text(
             when {
+                !granted -> "Tap to allow nearby devices"
+                !btOn -> "Bluetooth is off"
                 near -> "Together right now"
                 ui.togetherTodayMin > 0 -> "Together ${ui.togetherTodayMin / 60}h ${ui.togetherTodayMin % 60}m today"
                 else -> "Apart"
             },
             color = if (near) PL.Sys else PL.Dim,
-            fontSize = 13.sp, fontWeight = if (near) FontWeight.SemiBold else FontWeight.Normal,
+            fontSize = 12.5.sp, fontWeight = if (near) FontWeight.SemiBold else FontWeight.Normal,
         )
         if (near && ui.togetherTodayMin > 0) {
             Text("  ·  ${ui.togetherTodayMin / 60}h ${ui.togetherTodayMin % 60}m today",
