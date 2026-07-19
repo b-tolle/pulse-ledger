@@ -54,6 +54,10 @@ object Profile {
         get() = p()?.getInt("startTab", 0) ?: 0
         set(v) { p()?.edit()?.putInt("startTab", v)?.apply(); rev.intValue++ }
 
+    var stepGoal: Int
+        get() = p()?.getInt("stepGoal", 8000) ?: 8000
+        set(v) { p()?.edit()?.putInt("stepGoal", v)?.apply(); rev.intValue++ }
+
     val age: Int get() = java.time.Period.between(birth, java.time.LocalDate.now()).years
     val maxHr: Int get() = (208 - 0.7 * age).toInt()
     val zoneLight: Int get() = (maxHr * 0.50).toInt()

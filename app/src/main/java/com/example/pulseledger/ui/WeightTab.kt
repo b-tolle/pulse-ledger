@@ -55,6 +55,7 @@ fun WeightTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                 ))
         }
         item { GlpTracker(ui, vm) }
+        item { StepsGoalCard(ui) }
         if (w.size >= 2) item {
             Card {
                 SectionLabel("TREND · ${w.size} ENTRIES")
@@ -223,4 +224,36 @@ private fun AddWeightDialog(onDismiss: () -> Unit, onSave: (Double) -> Unit) {
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = PL.Soft) } },
     )
+}
+
+
+@Composable
+private fun StepsGoalCard(ui: DashboardViewModel.Ui) {
+    Card {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            SectionLabel("STEPS TODAY", Modifier.weight(1f))
+            val today = ui.stepsToday ?: 0L
+            Text("%,d / %,d".format(today, Profile.stepGoal), color = PL.Txt,
+                fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+        }
+        Spacer(Modifier.height(10.dp))
+        val pct = ((ui.stepsToday ?: 0L).toFloat() / Profile.stepGoal).coerceIn(0f, 1f)
+        Canvas(Modifier.fillMaxWidth().height(16.dp)) {
+            drawRoundRect(PL.CardUp, cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
+            if (pct > 0f) drawRoundRect(
+                if (pct >= 1f) PL.Charge else PL.Charge.copy(alpha = 0.85f),
+                size = androidx.compose.ui.geometry.Size(size.width * pct, size.height),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            if (pct >= 1f) "Goal hit — nice." else "%.0f%% of your daily goal".format(pct * 100),
+            color = if (pct >= 1f) PL.Charge else PL.Soft, fontSize = 11.5.sp,
+        )
+        if (ui.stepWeekLive.any { it != null }) {
+            Spacer(Modifier.height(10.dp))
+            WeekBars(ui.stepWeekLive, PL.Charge, 52, labels = ui.weekLabels)
+        }
+    }
 }

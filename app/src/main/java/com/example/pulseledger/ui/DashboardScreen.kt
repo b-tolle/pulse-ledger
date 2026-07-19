@@ -49,6 +49,15 @@ fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequest
         Triple("Sleep", Icons.Outlined.Bedtime, 4),
         Triple("Data", Icons.Outlined.Insights, 5),
     )
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            primary = PL.Dia, onPrimary = PL.Bg,
+            background = PL.Bg, onBackground = PL.Txt,
+            surface = PL.Card, onSurface = PL.Txt,
+            surfaceVariant = PL.CardUp, onSurfaceVariant = PL.Soft,
+            outline = PL.Line,
+        ),
+    ) {
     Scaffold(
         containerColor = PL.Bg,
         bottomBar = {
@@ -86,6 +95,7 @@ fun DashboardScreen(hcAvailable: Boolean, permissionsGranted: Boolean, onRequest
                 }
             }
         }
+    }
     }
 }
 

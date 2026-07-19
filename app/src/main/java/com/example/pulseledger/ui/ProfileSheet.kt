@@ -21,6 +21,7 @@ fun ProfileSheet(onDismiss: () -> Unit) {
     var waist by remember { mutableStateOf(Profile.waistIn?.let { "%.0f".format(it) } ?: "") }
     var goal by remember { mutableStateOf(Profile.goalLbs?.let { "%.0f".format(it) } ?: "") }
     var startTab by remember { mutableStateOf(Profile.startTab) }
+    var stepGoal by remember { mutableStateOf(Profile.stepGoal.toString()) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = PL.Card) {
         Column(
@@ -50,6 +51,8 @@ fun ProfileSheet(onDismiss: () -> Unit) {
                 label = { Text("Waist (inches, optional — enables BRI)") }, singleLine = true)
             OutlinedTextField(goal, { goal = it.filter(Char::isDigit).take(3) },
                 label = { Text("Goal weight (lb, optional)") }, singleLine = true)
+            OutlinedTextField(stepGoal, { stepGoal = it.filter(Char::isDigit).take(5) },
+                label = { Text("Daily step goal") }, singleLine = true)
 
             Text("START ON", color = PL.Soft, fontSize = 11.sp, letterSpacing = 1.5.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
@@ -74,6 +77,7 @@ fun ProfileSheet(onDismiss: () -> Unit) {
                     Profile.waistIn = waist.toDoubleOrNull()
                     Profile.goalLbs = goal.toDoubleOrNull()
                     Profile.startTab = startTab
+                    stepGoal.toIntOrNull()?.let { if (it in 1000..50000) Profile.stepGoal = it }
                     onDismiss()
                 },
                 modifier = Modifier.fillMaxWidth(),
