@@ -44,3 +44,17 @@ data class WeightEntry(
     val lbs: Double,
     val source: String,
 )
+
+
+@androidx.room.Entity(tableName = "med_shots")
+data class MedShot(
+    @androidx.room.PrimaryKey val epochMillis: Long,
+    val doseUnits: Double,
+    val name: String,
+)
+
+@androidx.room.Entity(tableName = "hunger_logs")
+data class HungerLog(
+    @androidx.room.PrimaryKey val dayEpoch: Long,
+    val level: Int,          // 1 (not hungry) .. 5 (very hungry)
+)

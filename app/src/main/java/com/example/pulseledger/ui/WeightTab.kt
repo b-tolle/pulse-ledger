@@ -54,6 +54,7 @@ fun WeightTab(ui: DashboardViewModel.Ui, vm: DashboardViewModel) {
                     "Goal" to (Profile.goalLbs?.let { "%.0f".format(it) } ?: ""),
                 ))
         }
+        item { GlpTracker(ui, vm) }
         if (w.size >= 2) item {
             Card {
                 SectionLabel("TREND · ${w.size} ENTRIES")
@@ -168,8 +169,11 @@ private fun BodyCard(lastLbs: Double?) {
             }
             Spacer(Modifier.height(8.dp))
             ShapeOutline(waist, h.toDouble())
-            Text("Solid = your proportions · dashed = mid-typical (waist ≈ 45% of height). BRI is height-and-waist based — it sees shape, not just mass.",
+            Text("Solid = your proportions · dashed = mid-typical (waist ≈ 45% of height).",
                 color = PL.Dim, fontSize = 10.5.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 6.dp))
+            Spacer(Modifier.height(8.dp))
+            Text("What these mean: BMI is weight relative to height — simple, but blind to where weight sits; muscle and belly score the same. BRI (2024) models your torso as an ellipse from height and waist, so it tracks shape — a better signal for visceral fat and the health risks that come with it. Watching BRI fall while weight drops means the loss is coming from the middle.",
+                color = PL.Soft, fontSize = 11.5.sp, lineHeight = 17.sp)
         }
     }
 }

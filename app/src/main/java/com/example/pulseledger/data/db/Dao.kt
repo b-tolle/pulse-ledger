@@ -14,6 +14,16 @@ interface HealthDao {
 
     @Query("SELECT * FROM weight_entries ORDER BY epochMillis ASC")
     suspend fun allWeights(): List<WeightEntry>
+
+    @Upsert suspend fun upsertShot(shot: MedShot)
+
+    @Query("SELECT * FROM med_shots ORDER BY epochMillis DESC LIMIT 30")
+    suspend fun recentShots(): List<MedShot>
+
+    @Upsert suspend fun upsertHunger(log: HungerLog)
+
+    @Query("SELECT * FROM hunger_logs ORDER BY dayEpoch DESC LIMIT 30")
+    suspend fun recentHunger(): List<HungerLog>
     @Upsert suspend fun upsertSummaries(summaries: List<DailySummary>)
 
     @Query("SELECT * FROM bp_readings ORDER BY epochMillis DESC LIMIT :limit")
@@ -61,8 +71,10 @@ interface HealthDao {
         com.example.pulseledger.env.EnvSample::class,
         LocationDay::class,
         WeightEntry::class,
+        MedShot::class,
+        HungerLog::class,
     ],
-    version = 5,
+    version = 6,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): HealthDao

@@ -10,6 +10,8 @@ import com.example.pulseledger.data.db.BpReading
 import com.example.pulseledger.data.db.DailySummary
 import com.example.pulseledger.data.db.LocationDay
 import com.example.pulseledger.data.db.WeightEntry
+import com.example.pulseledger.data.db.MedShot
+import com.example.pulseledger.data.db.HungerLog
 import com.example.pulseledger.life.CalendarReader
 import com.example.pulseledger.life.Places
 import com.example.pulseledger.life.CurrentLocation
@@ -60,6 +62,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val sleepNight: HealthConnectManager.SleepNight? = null,
         val workouts: List<WorkoutUi> = emptyList(),
         val weights: List<WeightEntry> = emptyList(),   // oldest first
+        val shots: List<MedShot> = emptyList(),         // newest first
+        val hungerWeek: List<Double?> = emptyList(),    // last 7 days, oldest first
     )
 
     private val _ui = MutableStateFlow(Ui())
@@ -147,6 +151,12 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val histSince = dao.earliestStepDay()
                 val allSummaries = dao.allSummaries()
                 val localWeights = dao.allWeights()
+                val shots = dao.recentShots()
+                val hungerByDay = dao.recentHunger().associate { it.dayEpoch to it.level }
+                val hungerWeek = (6 downTo 0).map { back ->
+                    hungerByDay[java.time.LocalDate.now(zoneId2()).minusDays(back.toLong())
+                        .atStartOfDay(zoneId2()).toInstant().toEpochMilli()]?.toDouble()
+                }
                 val hcWeights = runCatching {
                     hc.readWeights(now.minus(Duration.ofDays(3650)), now)
                 }.getOrDefault(emptyList())
@@ -190,6 +200,8 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     sleepNight = night,
                     workouts = workouts,
                     weights = weights,
+                    shots = shots,
+                    hungerWeek = hungerWeek,
                 )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(loading = false, error = t.message ?: "read failed")
@@ -204,6 +216,23 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val today = now - now % dayMs
         val byDay = _ui.value.summaries.associateBy { it.dayEpoch }
         return (6 downTo 0).map { back -> byDay[today - back * dayMs]?.let(pick) }
+    }
+
+    fun addShot(doseUnits: Double, name: String) {
+        viewModelScope.launch {
+            Db.get(getApplication()).dao().upsertShot(
+                MedShot(System.currentTimeMillis(), doseUnits, name))
+            load()
+        }
+    }
+
+    fun logHunger(level: Int) {
+        viewModelScope.launch {
+            val day = java.time.LocalDate.now(zoneId2())
+                .atStartOfDay(zoneId2()).toInstant().toEpochMilli()
+            Db.get(getApplication()).dao().upsertHunger(HungerLog(day, level))
+            load()
+        }
     }
 
     fun addWeight(lbs: Double) {
